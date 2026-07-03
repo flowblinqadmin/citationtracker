@@ -54,6 +54,7 @@ interface TopSource {
   domain: string;
   count: number;
   brand: boolean;
+  platforms: string[]; // which models cited this page
   check: CheckStatus | null; // verification verdict; null = pending
 }
 
@@ -659,7 +660,9 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                               </a>
                               {" "}<CheckBadge check={sSrc.check} />
                             </span>
-                            <span style={{ color: MUTED, whiteSpace: "nowrap" }}>{sSrc.count}×</span>
+                            <span style={{ color: MUTED, whiteSpace: "nowrap" }}>
+                              {sSrc.platforms.map((p) => PLATFORM_LABEL[p] ?? p).join(" + ")} · {sSrc.count}×
+                            </span>
                           </div>
                         ))}
                       </div>

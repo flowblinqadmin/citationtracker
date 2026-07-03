@@ -2,7 +2,7 @@
 // brand. Pure classifier + SSRF URL guard; the fetch itself is exercised with
 // an injected fetcher.
 import { describe, it, expect, vi } from "vitest";
-import { classifyPage, isFetchableUrl, verifyCitationUrl, stripHtml } from "@/lib/citation-verify";
+import { classifyPage, isFetchableUrl, verifyCitationUrl, stripHtml, markdownMentionsBrand } from "@/lib/citation-verify";
 
 describe("isFetchableUrl (SSRF guard)", () => {
   it("allows plain public http(s) URLs", () => {
@@ -82,6 +82,15 @@ describe("stripHtml", () => {
   });
 });
 
+describe("markdownMentionsBrand", () => {
+  it("matches visible markdown text but never link URLs", () => {
+    expect(markdownMentionsBrand("Why **FlowBlinq** wins", ["FlowBlinq"])).toBe(true);
+    // brand appears only inside a link target — not a mention
+    expect(markdownMentionsBrand("[click here](https://flowblinq.com/x)", ["FlowBlinq"])).toBe(false);
+    expect(markdownMentionsBrand("see https://flowblinq.com/x for info", ["FlowBlinq"])).toBe(false);
+  });
+});
+
 describe("verifyCitationUrl", () => {
   const KW = ["FlowBlinq"];
 
@@ -119,5 +128,39 @@ describe("verifyCitationUrl", () => {
     const r = await verifyCitationUrl("http://localhost/x", KW, fetcher);
     expect(r.status).toBe("unverifiable");
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("escalates a bot-blocked page to the crawler and verifies from its markdown", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response("blocked", { status: 403 }));
+    const crawler = vi.fn().mockResolvedValue("# Review\nFlowBlinq is great");
+    const r = await verifyCitationUrl("https://g2.com/products/x", KW, fetcher, crawler);
+    expect(r).toMatchObject({ status: "verified", brandMatched: true, via: "crawler" });
+  });
+
+  it("escalates a no_mention page to the crawler — confirms the hallucination when still absent", async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response("<p>AI Flow alternatives</p>", { status: 200, headers: { "content-type": "text/html" } }),
+    );
+    const crawler = vi.fn().mockResolvedValue("# Best AI Flow alternatives\nAppfire Flow…");
+    const r = await verifyCitationUrl("https://sitepoint.com/x", KW, fetcher, crawler);
+    expect(r).toMatchObject({ status: "no_mention", brandMatched: false, via: "crawler" });
+  });
+
+  it("keeps the direct verdict when the crawler fails or is unavailable", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response("blocked", { status: 403 }));
+    const crawler = vi.fn().mockResolvedValue(null);
+    const r = await verifyCitationUrl("https://g2.com/x", KW, fetcher, crawler);
+    expect(r.status).toBe("unverifiable");
+  });
+
+  it("does not escalate verified or dead verdicts", async () => {
+    const crawler = vi.fn();
+    const ok = vi.fn().mockResolvedValue(
+      new Response("<p>FlowBlinq</p>", { status: 200, headers: { "content-type": "text/html" } }),
+    );
+    await verifyCitationUrl("https://a.example.com/x", KW, ok, crawler);
+    const gone = vi.fn().mockResolvedValue(new Response("nope", { status: 404 }));
+    await verifyCitationUrl("https://b.example.com/x", KW, gone, crawler);
+    expect(crawler).not.toHaveBeenCalled();
   });
 });

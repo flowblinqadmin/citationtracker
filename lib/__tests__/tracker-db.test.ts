@@ -381,6 +381,7 @@ describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
         domain: "acme.com",
         count: 1,
         brand: true,
+        platforms: ["openai"],
         check: null,
       });
       expect(top).toHaveLength(4); // cit_5's vertexaisearch host is filtered out

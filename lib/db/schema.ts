@@ -84,6 +84,7 @@ export const citationChecks = pgTable("citation_checks", {
   status: text("status").$type<CitationCheckStatus>().notNull(),
   httpStatus: integer("http_status"),
   brandMatched: boolean("brand_matched"),
+  via: text("via").$type<"fetch" | "crawler" | null>(),
   checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

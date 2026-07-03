@@ -10,9 +10,9 @@ import { assertCronAuth } from "@/lib/cron-auth";
 import { listUncheckedTeamCitations, recordCitationChecks, type CitationCheckInput } from "@/lib/tracker-db";
 import { verifyCitationUrl } from "@/lib/citation-verify";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
-const BATCH = 20; // × up to 10s each at CONCURRENCY 5 stays inside maxDuration
+const BATCH = 15; // crawler escalations can take ~40s each — stay inside maxDuration
 const CONCURRENCY = 5;
 
 export async function GET(req: NextRequest) {
@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
         status: verdicts[j].status,
         httpStatus: verdicts[j].httpStatus,
         brandMatched: verdicts[j].brandMatched,
+        via: verdicts[j].via,
       });
     });
   }

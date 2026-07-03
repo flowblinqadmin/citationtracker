@@ -77,15 +77,75 @@ export function classifyPage(
 
 export interface CitationVerdict extends PageVerdict {
   httpStatus?: number;
+  /** How the final verdict was reached. */
+  via?: "fetch" | "crawler";
 }
 
 type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
+/** Returns the page as markdown, or null when the crawl fails/unavailable. */
+type Crawler = (url: string) => Promise<string | null>;
 
-/** Fetch a cited URL (guarded, manual redirects) and classify it. */
+/** Brand keywords against markdown's visible text — link targets don't count. */
+export function markdownMentionsBrand(markdown: string, brandKeywords: string[]): boolean {
+  const text = markdown
+    .replace(/\]\([^)]*\)/g, "] ") // markdown link targets
+    .replace(/https?:\/\/\S+/g, " ") // bare URLs
+    .toLowerCase();
+  return brandKeywords.some((k) => k.trim() && text.includes(k.trim().toLowerCase()));
+}
+
+/**
+ * Firecrawl scrape — the escalation path. It renders JS and gets through
+ * bot walls (g2/producthunt 403 plain fetchers), so it settles the two
+ * verdicts a plain fetch can't: bot-blocked pages and possible false
+ * no_mention on JS-rendered content.
+ */
+async function firecrawlScrape(url: string): Promise<string | null> {
+  const key = process.env.FIRECRAWL_API_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: false, timeout: 30_000 }),
+      signal: AbortSignal.timeout(40_000),
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    const md = body?.data?.markdown;
+    return typeof md === "string" ? md.slice(0, MAX_BODY_CHARS) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch a cited URL (guarded, manual redirects) and classify it. Verdicts a
+ * plain fetch can't settle (bot-blocked, or live-but-no-mention that might be
+ * JS-rendered) escalate to the crawler before being finalized.
+ */
 export async function verifyCitationUrl(
   url: string,
   brandKeywords: string[],
   fetcher: Fetcher = fetch,
+  crawler: Crawler = firecrawlScrape,
+): Promise<CitationVerdict> {
+  const direct = await directFetchVerdict(url, brandKeywords, fetcher);
+  if (direct.status !== "unverifiable" && direct.status !== "no_mention") return direct;
+  if (!isFetchableUrl(url)) return direct; // never hand a blocked URL to the crawler
+
+  const markdown = await crawler(url);
+  if (markdown === null) return direct; // crawler unavailable — keep the honest verdict
+  const matched = markdownMentionsBrand(markdown, brandKeywords);
+  return matched
+    ? { status: "verified", brandMatched: true, httpStatus: direct.httpStatus, via: "crawler" }
+    : { status: "no_mention", brandMatched: false, httpStatus: direct.httpStatus, via: "crawler" };
+}
+
+async function directFetchVerdict(
+  url: string,
+  brandKeywords: string[],
+  fetcher: Fetcher,
 ): Promise<CitationVerdict> {
   let current = url;
   try {
@@ -105,7 +165,7 @@ export async function verifyCitationUrl(
       const body =
         res.status < 400 ? (await res.text()).slice(0, MAX_BODY_CHARS) : "";
       const verdict = classifyPage(res.status, res.headers.get("content-type"), body, brandKeywords);
-      return { ...verdict, httpStatus: res.status };
+      return { ...verdict, httpStatus: res.status, via: "fetch" };
     }
     return { status: "unverifiable" }; // redirect loop
   } catch {

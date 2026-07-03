@@ -19,3 +19,6 @@ CREATE TABLE IF NOT EXISTS citation_checks (
 );
 
 CREATE INDEX IF NOT EXISTS citation_checks_run_id_idx ON citation_checks (run_id);
+
+-- How the verdict was reached ('fetch' | 'crawler'); added with the Firecrawl escalation.
+ALTER TABLE citation_checks ADD COLUMN IF NOT EXISTS via text;

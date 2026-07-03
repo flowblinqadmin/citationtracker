@@ -155,6 +155,7 @@ CREATE TABLE IF NOT EXISTS citation_checks (
   status        text NOT NULL,
   http_status   integer,
   brand_matched boolean,
+  via           text,
   checked_at    timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS citation_checks_run_id_idx ON citation_checks (run_id);

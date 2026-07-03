@@ -350,6 +350,8 @@ export interface TopSource {
   domain: string;
   count: number;
   brand: boolean;
+  /** Which models cited this page. */
+  platforms: string[];
   /** Verification verdict (hallucination guard); null = not yet checked. */
   check: CitationCheckStatus | null;
 }
@@ -393,6 +395,7 @@ export async function getRunTopSources(
       domain: trackerCitations.domain,
       count: sql<number>`count(distinct ${trackerCitations.id})::int`,
       url: sql<string>`min(coalesce(${trackerCitations.resolvedUrl}, ${trackerCitations.rawUrl}))`,
+      platforms: sql<Array<string | null> | null>`array_agg(distinct ${trackerCitations.platform}) filter (where ${trackerCitations.platform} is not null)`,
       checks: sql<Array<string | null> | null>`array_agg(distinct ${citationChecks.status}) filter (where ${citationChecks.status} is not null)`,
     })
     .from(trackerCitations)
@@ -403,8 +406,9 @@ export async function getRunTopSources(
     .limit(limit);
   return rows
     .filter((r) => r.domain !== "" && !REDIRECT_HOSTS.includes(r.domain))
-    .map(({ checks, ...r }) => ({
+    .map(({ checks, platforms, ...r }) => ({
       ...r,
+      platforms: (platforms ?? []).filter((p): p is string => !!p),
       brand: !!brandDomain && (r.domain === brandDomain || r.domain.endsWith(`.${brandDomain}`)),
       check: worstCheck(checks),
     }));
@@ -464,6 +468,7 @@ export interface CitationCheckInput {
   status: CitationCheckStatus;
   httpStatus?: number;
   brandMatched?: boolean;
+  via?: "fetch" | "crawler";
 }
 
 /** Record verdicts — first verdict wins (idempotent re-sweeps). */
@@ -480,6 +485,7 @@ export async function recordCitationChecks(checks: CitationCheckInput[]): Promis
         status: c.status,
         httpStatus: c.httpStatus ?? null,
         brandMatched: c.brandMatched ?? null,
+        via: c.via ?? null,
       })),
     )
     .onConflictDoNothing({ target: citationChecks.citationId });
