@@ -1,9 +1,143 @@
-// Placeholder — replaced by the brand list in the UI commit.
-export default function Home() {
+"use client";
+
+// Brand list — the app home. Create brands, see credit balance, drill in.
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { toast } from "sonner";
+import { apiUrl } from "@/lib/api-url";
+import { GEO_ORIGIN } from "@/lib/config";
+
+interface Brand {
+  id: string;
+  name: string;
+  domain: string | null;
+  runFrequency: "manual" | "weekly" | "monthly";
+  createdAt: string;
+}
+
+interface TeamInfo {
+  teamName: string;
+  creditBalance: number;
+}
+
+const CARD = "#ffffff";
+const BORDER = "1px solid rgba(0,0,0,0.08)";
+const MUTED = "#78716c";
+const ACCENT = "#b45309";
+
+export default function BrandListPage() {
+  const [team, setTeam] = useState<TeamInfo | null>(null);
+  const [brands, setBrands] = useState<Brand[] | null>(null);
+  const [name, setName] = useState("");
+  const [domain, setDomain] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const load = useCallback(async () => {
+    const [teamRes, brandsRes] = await Promise.all([
+      fetch(apiUrl("/api/teams/me")),
+      fetch(apiUrl("/api/brands")),
+    ]);
+    if (teamRes.ok) setTeam(await teamRes.json());
+    if (brandsRes.ok) setBrands((await brandsRes.json()).brands);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function createBrand(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setCreating(true);
+    try {
+      const res = await fetch(apiUrl("/api/brands"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), domain: domain.trim() || undefined }),
+      });
+      if (!res.ok) {
+        toast.error((await res.json()).error ?? "Could not create brand");
+        return;
+      }
+      setName("");
+      setDomain("");
+      await load();
+      toast.success("Brand created — add prompts next");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   return (
-    <main style={{ maxWidth: 720, margin: "80px auto", padding: "0 24px" }}>
-      <h1>FlowBlinq Citations</h1>
-      <p>Track your brand across ChatGPT, Perplexity, and Gemini.</p>
+    <main style={{ maxWidth: 860, margin: "0 auto", padding: "40px 24px" }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 32 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 26 }}>Citations</h1>
+          <p style={{ margin: "6px 0 0", color: MUTED, fontSize: 14 }}>
+            Track how ChatGPT, Perplexity, and Gemini cite your brands.
+          </p>
+        </div>
+        <div style={{ textAlign: "right", fontSize: 14 }}>
+          <div style={{ color: MUTED }}>{team?.teamName ?? "…"}</div>
+          <div>
+            <strong style={{ color: (team?.creditBalance ?? 0) < 0 ? "#dc2626" : "inherit" }}>
+              {team ? `${team.creditBalance} credits` : "…"}
+            </strong>
+            {" · "}
+            <a href={`${GEO_ORIGIN}/dashboard`} style={{ color: ACCENT }}>Buy credits</a>
+          </div>
+        </div>
+      </header>
+
+      <form onSubmit={createBrand} style={{ display: "flex", gap: 8, marginBottom: 28 }}>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Brand name (e.g. Acme)"
+          maxLength={100}
+          style={{ flex: 2, padding: "10px 12px", border: BORDER, borderRadius: 8, fontSize: 14 }}
+        />
+        <input
+          value={domain}
+          onChange={(e) => setDomain(e.target.value)}
+          placeholder="Domain (optional)"
+          maxLength={253}
+          style={{ flex: 1, padding: "10px 12px", border: BORDER, borderRadius: 8, fontSize: 14 }}
+        />
+        <button
+          type="submit"
+          disabled={creating || !name.trim()}
+          style={{ padding: "10px 18px", background: ACCENT, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", opacity: creating || !name.trim() ? 0.5 : 1 }}
+        >
+          Add brand
+        </button>
+      </form>
+
+      {brands === null ? (
+        <p style={{ color: MUTED }}>Loading…</p>
+      ) : brands.length === 0 ? (
+        <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: 32, textAlign: "center", color: MUTED }}>
+          No brands yet. Add one above, pick prompts from the library, and run your first citation check.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {brands.map((b) => (
+            <Link
+              key={b.id}
+              href={`/brands/${b.id}`}
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: CARD, border: BORDER, borderRadius: 12, padding: "16px 20px", textDecoration: "none" }}
+            >
+              <div>
+                <strong>{b.name}</strong>
+                {b.domain && <span style={{ color: MUTED, marginLeft: 10, fontSize: 13 }}>{b.domain}</span>}
+              </div>
+              <span style={{ color: MUTED, fontSize: 13 }}>
+                {b.runFrequency === "manual" ? "manual runs" : `runs ${b.runFrequency}`} →
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
     </main>
   );
 }
