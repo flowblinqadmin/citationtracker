@@ -16,7 +16,7 @@ export const MODEL_COST_ESTIMATES = {
 
 export const CITATION_EXEC_MARGIN = 1.3;
 export const CREDIT_USD = 0.1; // geo: $10 per 100-credit pack
-export const ALL_PLATFORM_COUNT = 3;
+const ALL_PLATFORM_COUNT = 3;
 
 export const CITATION_EXEC_PRICE_USD =
   Math.max(...Object.values(MODEL_COST_ESTIMATES)) * CITATION_EXEC_MARGIN;
