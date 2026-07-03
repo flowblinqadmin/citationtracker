@@ -531,6 +531,42 @@ export interface RunResponseRow {
   createdAt: Date | null;
 }
 
+/**
+ * Swap each response's raw cited URLs for the redirect-resolved URLs geo
+ * recorded on the citation rows. Gemini grounding URLs are signed redirects
+ * that expire — a raw one with no recorded resolution is a dead link and is
+ * dropped rather than served.
+ */
+async function resolveCitedUrls<T extends { responseId: string; citedUrls: string[] }>(
+  rows: T[],
+): Promise<Array<Omit<T, "responseId">>> {
+  const ids = [...new Set(rows.map((r) => r.responseId))];
+  const resolutions = ids.length
+    ? await db
+        .select({
+          responseId: trackerCitations.responseId,
+          rawUrl: trackerCitations.rawUrl,
+          resolvedUrl: trackerCitations.resolvedUrl,
+        })
+        .from(trackerCitations)
+        .where(inArray(trackerCitations.responseId, ids))
+    : [];
+  const byResponse = new Map<string, Map<string, string>>();
+  for (const r of resolutions) {
+    if (!r.responseId || !r.resolvedUrl) continue;
+    if (!byResponse.has(r.responseId)) byResponse.set(r.responseId, new Map());
+    byResponse.get(r.responseId)!.set(r.rawUrl, r.resolvedUrl);
+  }
+  const isDeadRedirect = (url: string) =>
+    REDIRECT_HOSTS.some((h) => url.startsWith(`https://${h}/`) || url.startsWith(`http://${h}/`));
+  return rows.map(({ responseId, ...row }) => ({
+    ...row,
+    citedUrls: (row.citedUrls ?? [])
+      .map((u) => byResponse.get(responseId)?.get(u) ?? u)
+      .filter((u) => !isDeadRedirect(u)),
+  }));
+}
+
 /** A run's raw replies, joined with the exact prompt text that was asked. */
 export async function listRunResponses(
   teamId: string,
@@ -541,6 +577,7 @@ export async function listRunResponses(
   if (!brand) return [];
   const rows = await db
     .select({
+      responseId: trackerResponses.id,
       promptName: trackerPrompts.name,
       promptText: trackerPromptVersions.text,
       platform: trackerResponses.platform,
@@ -557,7 +594,7 @@ export async function listRunResponses(
     .innerJoin(trackerPrompts, eq(trackerPromptVersions.promptId, trackerPrompts.id))
     .where(and(eq(trackerResponses.runId, runId), eq(trackerResponses.clientId, clientId)))
     .orderBy(asc(trackerPrompts.createdAt), asc(trackerResponses.platform), asc(trackerResponses.attempt));
-  return rows.map((r) => ({ ...r, citedUrls: r.citedUrls ?? [] }));
+  return resolveCitedUrls(rows.map((r) => ({ ...r, citedUrls: r.citedUrls ?? [] })));
 }
 
 export interface PromptHistoryRow {
@@ -593,6 +630,7 @@ export async function listPromptHistory(
   if (!prompt) return [];
   return db
     .select({
+      responseId: trackerResponses.id,
       runId: trackerRuns.id,
       period: trackerRuns.period,
       runCreatedAt: trackerRuns.createdAt,
@@ -611,5 +649,5 @@ export async function listPromptHistory(
     .innerJoin(trackerRuns, eq(trackerResponses.runId, trackerRuns.id))
     .where(and(eq(trackerPromptVersions.promptId, promptId), eq(trackerResponses.clientId, clientId)))
     .orderBy(asc(trackerRuns.createdAt), asc(trackerResponses.platform), asc(trackerResponses.attempt))
-    .then((rows) => rows.map((r) => ({ ...r, citedUrls: r.citedUrls ?? [] })));
+    .then((rows) => resolveCitedUrls(rows.map((r) => ({ ...r, citedUrls: r.citedUrls ?? [] }))));
 }

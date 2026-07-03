@@ -263,6 +263,32 @@ describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
     });
   });
 
+  it("serves cited URLs redirect-RESOLVED (from recorded citations), dropping dead redirects", async () => {
+    const vertexRaw = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc";
+    const vertexDead = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/dead";
+    const [version] = await db
+      .select()
+      .from(schema.trackerPromptVersions)
+      .where(eq(schema.trackerPromptVersions.promptId, promptId));
+    await db.insert(schema.trackerResponses).values({
+      id: "resp_vertex", runId, clientId, promptVersionId: version.id,
+      platform: "google", attempt: 1, responseText: "…",
+      citedUrls: [vertexRaw, vertexDead, "https://plain.example.com/a"],
+      brandMentioned: false,
+    });
+    // Geo records the resolution on the citation row (raw → resolved).
+    await db.insert(schema.trackerCitations).values({
+      id: `${runId}_res`, responseId: "resp_vertex", runId, clientId,
+      promptVersionId: version.id, platform: "google",
+      rawUrl: vertexRaw, resolvedUrl: "https://acme.com/blog/post",
+      normalizedUrl: "acme.com/blog/post", domain: "acme.com", matchType: "unmatched",
+    });
+    const rows = await tdb.listRunResponses(TEAM, clientId, runId);
+    const vertex = rows.find((r) => r.platform === "google")!;
+    // Resolved recorded → substituted; unresolved redirect → dropped; plain URL → kept.
+    expect(vertex.citedUrls).toEqual(["https://acme.com/blog/post", "https://plain.example.com/a"]);
+  });
+
   it("lists a run's replies joined with prompt name/text", async () => {
     const rows = await tdb.listRunResponses(TEAM, clientId, runId);
     expect(rows).toHaveLength(1);

@@ -84,6 +84,7 @@ interface HistoryRow {
   platform: string;
   attempt: number;
   responseText: string | null;
+  citedUrls: string[];
   brandMentioned: boolean;
   sentiment: string | null;
 }
@@ -228,7 +229,40 @@ function previewSlice(text: string): string {
   return `${cut}…`;
 }
 
-function ReplyText({ text, mentioned, sentiment }: { text: string | null; mentioned: boolean; sentiment?: string | null }) {
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+};
+
+/** Cited sources as links — URLs arrive redirect-resolved from the API. */
+function SourceLinks({ urls }: { urls?: string[] }) {
+  if (!urls?.length) return null;
+  const seen = new Set<string>();
+  const sources = urls.flatMap((u) => {
+    const host = hostOf(u);
+    if (!host || seen.has(host)) return [];
+    seen.add(host);
+    return [{ host, url: u }];
+  });
+  return (
+    <span style={{ color: MUTED }}>
+      Sources:{" "}
+      {sources.map((s, i) => (
+        <span key={s.host}>
+          {i > 0 && " · "}
+          <a href={s.url} target="_blank" rel="noopener noreferrer" style={{ color: ACCENT }}>
+            {s.host}
+          </a>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function ReplyText({ text, mentioned, sentiment, citedUrls }: { text: string | null; mentioned: boolean; sentiment?: string | null; citedUrls?: string[] }) {
   const [expanded, setExpanded] = useState(false);
   const long = (text?.length ?? 0) > REPLY_PREVIEW_CHARS;
   const shown = !text ? null : expanded || !long ? text : previewSlice(text);
@@ -239,9 +273,10 @@ function ReplyText({ text, mentioned, sentiment }: { text: string | null; mentio
       ) : (
         <ReactMarkdown components={MD_COMPONENTS}>{shown}</ReactMarkdown>
       )}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6, fontSize: 11 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginTop: 6, fontSize: 11 }}>
         {mentioned && <span style={{ color: GREEN, fontWeight: 600 }}>✓ brand mentioned</span>}
         <SentimentChip sentiment={sentiment ?? null} />
+        <SourceLinks urls={citedUrls} />
         {long && (
           <button
             onClick={() => setExpanded((v) => !v)}
@@ -746,7 +781,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                           <span style={{ marginLeft: 6, padding: "1px 6px", background: "#fff7ed", border: BORDER, borderRadius: 999 }}>v{h.version}</span>
                         )}
                       </div>
-                      <ReplyText text={h.responseText} mentioned={h.brandMentioned} sentiment={h.sentiment} />
+                      <ReplyText text={h.responseText} mentioned={h.brandMentioned} sentiment={h.sentiment} citedUrls={h.citedUrls} />
                     </div>
                   ))}
                 </div>
@@ -814,7 +849,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                         {resp.model ? ` · ${resp.model}` : ""}
                         {resp.attempt > 1 ? ` · attempt ${resp.attempt}` : ""}
                       </div>
-                      <ReplyText text={resp.responseText} mentioned={resp.brandMentioned} sentiment={resp.sentiment} />
+                      <ReplyText text={resp.responseText} mentioned={resp.brandMentioned} sentiment={resp.sentiment} citedUrls={resp.citedUrls} />
                     </div>
                   ))}
                 </div>
