@@ -273,10 +273,12 @@ export async function listRuns(teamId: string, clientId: string): Promise<Tracke
  * from tracker.citations by the brand's own domain instead.
  */
 export interface RunCitationStats {
-  totalCitations: number;      // every cited URL captured for the run
+  totalCitations: number;      // cited URLs that passed verification (dead + hallucinated excluded)
   brandCitations: number;      // citations of the brand's domain (incl. subdomains)
   competitorCitations: number; // citations of named competitor domains
   brandCitationRate: number | null; // fraction of answered replies citing the brand; null without a domain
+  /** Citations whose page never mentions the brand — flagged by the guard, excluded above. */
+  hallucinatedCitations: number;
 }
 
 export type RunWithStats = TrackerRun & { citationStats: RunCitationStats };
@@ -302,15 +304,20 @@ export async function listRunsWithStats(teamId: string, clientId: string): Promi
     ? sql.join(competitorDomains.map((d) => domainMatch(trackerCitations.domain, d)), sql` OR `)
     : sql`false`;
 
+  // Citations flagged by the verification guard don't count: a dead link or a
+  // page that never mentions the brand is not a citation worth reporting.
+  const counted = sql`(${citationChecks.status} IS NULL OR ${citationChecks.status} NOT IN ('dead', 'no_mention'))`;
   const citeRows = await db
     .select({
       runId: trackerCitations.runId,
-      total: sql<number>`count(*)::int`,
-      brand: sql<number>`count(*) filter (where ${brandCond})::int`,
-      competitor: sql<number>`count(*) filter (where (${compCond}))::int`,
-      brandPairs: sql<number>`count(distinct (${trackerCitations.promptVersionId}, ${trackerCitations.platform})) filter (where ${brandCond})::int`,
+      total: sql<number>`count(*) filter (where ${counted})::int`,
+      brand: sql<number>`count(*) filter (where ${brandCond} AND ${counted})::int`,
+      competitor: sql<number>`count(*) filter (where (${compCond}) AND ${counted})::int`,
+      brandPairs: sql<number>`count(distinct (${trackerCitations.promptVersionId}, ${trackerCitations.platform})) filter (where ${brandCond} AND ${counted})::int`,
+      hallucinated: sql<number>`count(*) filter (where ${citationChecks.status} = 'no_mention')::int`,
     })
     .from(trackerCitations)
+    .leftJoin(citationChecks, eq(citationChecks.citationId, trackerCitations.id))
     .where(and(inArray(trackerCitations.runId, runIds), eq(trackerCitations.clientId, clientId)))
     .groupBy(trackerCitations.runId);
 
@@ -337,6 +344,7 @@ export async function listRunsWithStats(teamId: string, clientId: string): Promi
         competitorCitations: c?.competitor ?? 0,
         brandCitationRate:
           brandDomain && answered > 0 ? (c?.brandPairs ?? 0) / answered : null,
+        hallucinatedCitations: c?.hallucinated ?? 0,
       },
     };
   });
@@ -411,7 +419,9 @@ export async function getRunTopSources(
       platforms: (platforms ?? []).filter((p): p is string => !!p),
       brand: !!brandDomain && (r.domain === brandDomain || r.domain.endsWith(`.${brandDomain}`)),
       check: worstCheck(checks),
-    }));
+    }))
+    // A dead link or a page that never mentions the brand is not a source.
+    .filter((r) => r.check !== "dead" && r.check !== "no_mention");
 }
 
 // ── Citation verification (hallucination guard) ─────────────────────────────

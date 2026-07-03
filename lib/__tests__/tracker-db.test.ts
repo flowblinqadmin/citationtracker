@@ -361,7 +361,27 @@ describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
         competitorCitations: 1,
         // 1 of 2 answered (promptVersion × platform) pairs has a brand citation
         brandCitationRate: 0.5,
+        hallucinatedCitations: 0,
       });
+    });
+
+    it("excludes guard-flagged citations from totals and reports the hallucinated count", async () => {
+      await db.delete(schema.citationChecks);
+      await tdb.recordCitationChecks([
+        { citationId: `${runId}_cit_4`, runId, clientId, url: "https://wikipedia.org/x", status: "no_mention", brandMatched: false },
+        { citationId: `${runId}_cit_3`, runId, clientId, url: "https://rival.com/x", status: "dead" },
+      ]);
+      const runs = await tdb.listRunsWithStats(TEAM, clientId);
+      const run = runs.find((r) => r.id === runId)!;
+      expect(run.citationStats).toMatchObject({
+        totalCitations: 3, // 5 minus the dead + hallucinated ones
+        competitorCitations: 0, // the rival.com citation is dead
+        hallucinatedCitations: 1,
+      });
+      // and the hallucinated page is gone from top sources
+      const top = await tdb.getRunTopSources(TEAM, clientId, runId);
+      expect(top.some((t) => t.domain === "wikipedia.org")).toBe(false);
+      expect(top.some((t) => t.domain === "rival.com")).toBe(false);
     });
 
     it("rate is null when the brand has no domain", async () => {
@@ -446,13 +466,15 @@ describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
       expect(checks["https://g2.com/products/other-flow"]).toBe("no_mention"); // first verdict kept
     });
 
-    it("top sources carry the verdict; url→verdict map is org-scoped", async () => {
+    it("hallucinated pages leave top sources; url→verdict map is org-scoped", async () => {
       await tdb.recordCitationChecks([
         { citationId: `${runId}_v1`, runId, clientId, url: "https://g2.com/products/other-flow", status: "no_mention", brandMatched: false },
       ]);
       const top = await tdb.getRunTopSources(TEAM, clientId, runId);
-      expect(top.find((t) => t.domain === "g2.com")?.check).toBe("no_mention");
-      expect(top.find((t) => t.domain === "acme.com")?.check).toBeNull(); // pending
+      expect(top.some((t) => t.domain === "g2.com")).toBe(false); // filtered out
+      expect(top.find((t) => t.domain === "acme.com")?.check).toBeNull(); // pending stays
+      const checks = await tdb.listRunCitationChecks(TEAM, clientId, runId);
+      expect(checks["https://g2.com/products/other-flow"]).toBe("no_mention");
       expect(await tdb.listRunCitationChecks("tm_other_team", clientId, runId)).toEqual({});
     });
   });

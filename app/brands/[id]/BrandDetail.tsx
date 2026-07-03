@@ -45,6 +45,7 @@ interface Run {
     brandCitations: number;
     competitorCitations: number;
     brandCitationRate: number | null;
+    hallucinatedCitations: number;
   };
 }
 
@@ -263,7 +264,7 @@ function SourceLinks({ urls, checks }: { urls?: string[]; checks?: Record<string
   const sources = urls.flatMap((u) => {
     const host = hostOf(u);
     const check = checks?.[u] ?? null;
-    if (!host || seen.has(host) || check === "dead") return [];
+    if (!host || seen.has(host) || check === "dead" || check === "no_mention") return [];
     seen.add(host);
     return [{ host, url: u, check }];
   });
@@ -278,7 +279,6 @@ function SourceLinks({ urls, checks }: { urls?: string[]; checks?: Record<string
             {s.host}
           </a>
           {s.check === "verified" && <span title="Page mentions the brand" style={{ color: GREEN }}>✓</span>}
-          {s.check === "no_mention" && <span title="Page never mentions the brand — likely hallucinated" style={{ color: "#d97706" }}>⚠</span>}
         </span>
       ))}
     </span>
@@ -619,7 +619,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                     />
                     <MetricCard label="Brand mentions" value={pct(m.brandMentionRate)} sub="replies naming the brand" />
                     <MetricCard label="Share of AI voice" value={soav != null ? pct(soav) : "—"} sub="brand vs competitor citations" />
-                    <MetricCard label="Citations" value={String(stats?.totalCitations ?? 0)} sub="URLs cited in replies" />
+                    <MetricCard label="Citations" value={String(stats?.totalCitations ?? 0)} sub={stats?.hallucinatedCitations ? `verified sources · ${stats.hallucinatedCitations} hallucinated filtered out` : "verified sources"} />
                   </div>
 
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
@@ -646,7 +646,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                     <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
                       <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Top cited pages (latest run)</div>
                       <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
-                        {latestSources.filter((sSrc) => sSrc.check !== "dead").map((sSrc) => (
+                        {latestSources.filter((sSrc) => sSrc.check !== "dead" && sSrc.check !== "no_mention").map((sSrc) => (
                           <div key={sSrc.page} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                             <span style={{ overflowWrap: "anywhere" }}>
                               <a
