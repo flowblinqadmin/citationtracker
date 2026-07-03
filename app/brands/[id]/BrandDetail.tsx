@@ -47,6 +47,40 @@ const RED = "#dc2626";
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
+interface ReplyRow {
+  promptName: string;
+  promptText: string;
+  platform: string;
+  model: string | null;
+  attempt: number;
+  responseText: string | null;
+  citedUrls: string[];
+  brandMentioned: boolean;
+}
+
+interface HistoryRow {
+  runId: string;
+  period: string;
+  runCreatedAt: string | null;
+  version: number;
+  promptText: string;
+  platform: string;
+  attempt: number;
+  responseText: string | null;
+  brandMentioned: boolean;
+}
+
+const PLATFORM_LABEL: Record<string, string> = { openai: "ChatGPT", perplexity: "Perplexity", google: "Gemini" };
+
+function ReplyText({ text, mentioned }: { text: string | null; mentioned: boolean }) {
+  return (
+    <div style={{ whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.5, maxHeight: 220, overflowY: "auto", background: "#fafaf9", border: BORDER, borderRadius: 8, padding: "10px 12px" }}>
+      {text ?? <em style={{ color: MUTED }}>no response captured</em>}
+      {mentioned && <div style={{ marginTop: 6, fontSize: 11, color: GREEN, fontWeight: 600 }}>✓ brand mentioned</div>}
+    </div>
+  );
+}
+
 export default function BrandDetail({ clientId }: { clientId: string }) {
   const [brand, setBrand] = useState<Brand | null>(null);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -57,6 +91,10 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
   const [customText, setCustomText] = useState("");
   const [running, setRunning] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [openRunId, setOpenRunId] = useState<string | null>(null);
+  const [replies, setReplies] = useState<Record<string, ReplyRow[]>>({});
+  const [historyPromptId, setHistoryPromptId] = useState<string | null>(null);
+  const [history, setHistory] = useState<Record<string, HistoryRow[]>>({});
 
   const load = useCallback(async () => {
     const [brandRes, promptsRes, runsRes, teamRes] = await Promise.all([
@@ -139,6 +177,36 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
       setBrand((await res.json()).brand);
       if (runFrequency !== "manual") {
         toast.info(`Scheduled runs bill ~${runCost || citationRunCredits(1)} credits each, automatically.`);
+      }
+    }
+  }
+
+  async function toggleReplies(runId: string) {
+    if (openRunId === runId) {
+      setOpenRunId(null);
+      return;
+    }
+    setOpenRunId(runId);
+    if (!replies[runId]) {
+      const res = await fetch(apiUrl(`/api/brands/${clientId}/runs/${runId}/responses`));
+      if (res.ok) {
+        const body = await res.json();
+        setReplies((m) => ({ ...m, [runId]: body.responses }));
+      }
+    }
+  }
+
+  async function toggleHistory(promptId: string) {
+    if (historyPromptId === promptId) {
+      setHistoryPromptId(null);
+      return;
+    }
+    setHistoryPromptId(promptId);
+    if (!history[promptId]) {
+      const res = await fetch(apiUrl(`/api/brands/${clientId}/prompts/${promptId}/history`));
+      if (res.ok) {
+        const body = await res.json();
+        setHistory((m) => ({ ...m, [promptId]: body.history }));
       }
     }
   }
@@ -299,11 +367,38 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, fontSize: 12 }}>
+                  <button onClick={() => void toggleHistory(p.promptId)} style={{ background: "none", border: "none", color: ACCENT, cursor: "pointer" }}>
+                    {historyPromptId === p.promptId ? "Hide history" : "History"}
+                  </button>
                   <button onClick={() => void editPrompt(p)} style={{ background: "none", border: "none", color: ACCENT, cursor: "pointer" }}>Edit</button>
                   <button onClick={() => void archivePrompt(p.promptId)} style={{ background: "none", border: "none", color: MUTED, cursor: "pointer" }}>Remove</button>
                 </div>
               </div>
             ))}
+            {historyPromptId && history[historyPromptId] && (
+              <div style={{ background: CARD, border: BORDER, borderRadius: 10, padding: "12px 16px" }}>
+                <div style={{ fontSize: 12, color: MUTED, marginBottom: 10 }}>
+                  How the answers evolved — oldest first. A version chip marks where the prompt wording changed.
+                </div>
+                {history[historyPromptId].length === 0 && (
+                  <p style={{ color: MUTED, fontSize: 13, margin: 0 }}>No replies yet — run the prompts first.</p>
+                )}
+                <div style={{ display: "grid", gap: 12 }}>
+                  {history[historyPromptId].map((h, i) => (
+                    <div key={i}>
+                      <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>
+                        {h.period} · {PLATFORM_LABEL[h.platform] ?? h.platform}
+                        {h.attempt > 1 ? ` · attempt ${h.attempt}` : ""}
+                        {(i === 0 || history[historyPromptId][i - 1].version !== h.version) && (
+                          <span style={{ marginLeft: 6, padding: "1px 6px", background: "#fff7ed", border: BORDER, borderRadius: 999 }}>v{h.version}</span>
+                        )}
+                      </div>
+                      <ReplyText text={h.responseText} mentioned={h.brandMentioned} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {prompts.length === 0 && (
               <p style={{ color: MUTED, fontSize: 14 }}>No prompts yet — add a few from the library to get started.</p>
             )}
@@ -334,6 +429,31 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                 </div>
               )}
               {r.error && <div style={{ marginTop: 8, fontSize: 12, color: RED }}>{r.error}</div>}
+              {r.status === "complete" && (
+                <button
+                  onClick={() => void toggleReplies(r.id)}
+                  style={{ marginTop: 10, background: "none", border: "none", color: ACCENT, fontSize: 12, cursor: "pointer", padding: 0 }}
+                >
+                  {openRunId === r.id ? "Hide replies" : "View replies"}
+                </button>
+              )}
+              {openRunId === r.id && replies[r.id] && (
+                <div style={{ marginTop: 10, display: "grid", gap: 12 }}>
+                  {replies[r.id].map((resp, i) => (
+                    <div key={i}>
+                      {(i === 0 || replies[r.id][i - 1].promptText !== resp.promptText) && (
+                        <div style={{ fontSize: 13, fontWeight: 600, margin: "6px 0" }}>{resp.promptText}</div>
+                      )}
+                      <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>
+                        {PLATFORM_LABEL[resp.platform] ?? resp.platform}
+                        {resp.model ? ` · ${resp.model}` : ""}
+                        {resp.attempt > 1 ? ` · attempt ${resp.attempt}` : ""}
+                      </div>
+                      <ReplyText text={resp.responseText} mentioned={resp.brandMentioned} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </section>

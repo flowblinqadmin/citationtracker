@@ -11,6 +11,7 @@ import {
   trackerPrompts,
   trackerPromptVersions,
   trackerRuns,
+  trackerResponses,
   type TrackerClient,
   type TrackerRun,
 } from "@/lib/db/schema";
@@ -329,4 +330,98 @@ export async function listTeamRuns(): Promise<ReconcileRun[]> {
     .innerJoin(trackerOrgs, eq(trackerRuns.orgId, trackerOrgs.id))
     .where(and(like(trackerOrgs.id, "team\\_%"), gte(trackerRuns.createdAt, cutoff)));
   return rows.map((r) => ({ run: r.run, teamId: r.orgId.slice("team_".length) }));
+}
+
+// ── Replies (full response text) ─────────────────────────────────────────────
+
+export interface RunResponseRow {
+  promptName: string;
+  promptText: string;
+  platform: string;
+  model: string | null;
+  attempt: number;
+  responseText: string | null;
+  citedUrls: string[];
+  brandMentioned: boolean;
+  createdAt: Date | null;
+}
+
+/** A run's raw replies, joined with the exact prompt text that was asked. */
+export async function listRunResponses(
+  teamId: string,
+  clientId: string,
+  runId: string,
+): Promise<RunResponseRow[]> {
+  const brand = await getBrand(teamId, clientId);
+  if (!brand) return [];
+  const rows = await db
+    .select({
+      promptName: trackerPrompts.name,
+      promptText: trackerPromptVersions.text,
+      platform: trackerResponses.platform,
+      model: trackerResponses.model,
+      attempt: trackerResponses.attempt,
+      responseText: trackerResponses.responseText,
+      citedUrls: trackerResponses.citedUrls,
+      brandMentioned: trackerResponses.brandMentioned,
+      createdAt: trackerResponses.createdAt,
+    })
+    .from(trackerResponses)
+    .innerJoin(trackerPromptVersions, eq(trackerResponses.promptVersionId, trackerPromptVersions.id))
+    .innerJoin(trackerPrompts, eq(trackerPromptVersions.promptId, trackerPrompts.id))
+    .where(and(eq(trackerResponses.runId, runId), eq(trackerResponses.clientId, clientId)))
+    .orderBy(asc(trackerPrompts.createdAt), asc(trackerResponses.platform), asc(trackerResponses.attempt));
+  return rows.map((r) => ({ ...r, citedUrls: r.citedUrls ?? [] }));
+}
+
+export interface PromptHistoryRow {
+  runId: string;
+  period: string;
+  runCreatedAt: Date | null;
+  version: number;
+  promptText: string;
+  platform: string;
+  model: string | null;
+  attempt: number;
+  responseText: string | null;
+  citedUrls: string[];
+  brandMentioned: boolean;
+}
+
+/**
+ * One prompt's replies across ALL runs, oldest first — how the answers (and
+ * the prompt's own wording, via version) evolved over time.
+ */
+export async function listPromptHistory(
+  teamId: string,
+  clientId: string,
+  promptId: string,
+): Promise<PromptHistoryRow[]> {
+  const brand = await getBrand(teamId, clientId);
+  if (!brand) return [];
+  const [prompt] = await db
+    .select({ id: trackerPrompts.id })
+    .from(trackerPrompts)
+    .where(and(eq(trackerPrompts.id, promptId), eq(trackerPrompts.clientId, clientId)));
+  if (!prompt) return [];
+  return db
+    .select({
+      runId: trackerRuns.id,
+      period: trackerRuns.period,
+      runCreatedAt: trackerRuns.createdAt,
+      version: trackerPromptVersions.version,
+      promptText: trackerPromptVersions.text,
+      platform: trackerResponses.platform,
+      model: trackerResponses.model,
+      attempt: trackerResponses.attempt,
+      responseText: trackerResponses.responseText,
+      citedUrls: trackerResponses.citedUrls,
+      brandMentioned: trackerResponses.brandMentioned,
+    })
+    .from(trackerResponses)
+    .innerJoin(trackerPromptVersions, eq(trackerResponses.promptVersionId, trackerPromptVersions.id))
+    .innerJoin(trackerRuns, eq(trackerResponses.runId, trackerRuns.id))
+    .where(and(eq(trackerPromptVersions.promptId, promptId), eq(trackerResponses.clientId, clientId)))
+    .orderBy(asc(trackerRuns.createdAt), asc(trackerResponses.platform), asc(trackerResponses.attempt))
+    .then((rows) => rows.map((r) => ({ ...r, citedUrls: r.citedUrls ?? [] })));
 }

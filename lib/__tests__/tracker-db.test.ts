@@ -177,3 +177,62 @@ describe.skipIf(!dbUrl)("tracker-db (Postgres)", () => {
     });
   });
 });
+
+describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
+  const TEAM = "tm_resp_test";
+  let clientId: string;
+  let promptId: string;
+  let runId: string;
+
+  beforeEach(async () => {
+    await db.execute(sql`DELETE FROM tracker.orgs`);
+    await db.delete(schema.teams).where(eq(schema.teams.id, TEAM));
+    await db.insert(schema.teams).values({ id: TEAM, name: "Resp", ownerUserId: "u", creditBalance: 10 });
+    const b = await tdb.createBrand(TEAM, "Resp", { name: "Acme" });
+    clientId = b.id;
+    const p = await tdb.createPrompt(TEAM, clientId, { name: "P", category: "brand", text: "What is Acme?" });
+    promptId = p.promptId;
+
+    const created = await tdb.createManualRunRow(TEAM, clientId);
+    if (created.kind !== "run") throw new Error("setup");
+    runId = created.run.id;
+    // Simulate geo's worker persisting a response for the run.
+    const [version] = await db
+      .select()
+      .from(schema.trackerPromptVersions)
+      .where(eq(schema.trackerPromptVersions.promptId, promptId));
+    await db.insert(schema.trackerResponses).values({
+      id: "resp_1", runId, clientId, promptVersionId: version.id,
+      platform: "openai", model: "gpt-5.4-mini", attempt: 1,
+      responseText: "Acme is a company.", citedUrls: ["https://acme.com"], brandMentioned: true,
+    });
+  });
+
+  it("lists a run's replies joined with prompt name/text", async () => {
+    const rows = await tdb.listRunResponses(TEAM, clientId, runId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      promptName: "P",
+      promptText: "What is Acme?",
+      platform: "openai",
+      responseText: "Acme is a company.",
+      brandMentioned: true,
+    });
+  });
+
+  it("lists a prompt's reply history across runs", async () => {
+    const rows = await tdb.listPromptHistory(TEAM, clientId, promptId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ platform: "openai", period: expect.stringMatching(/^\d{4}-\d{2}$/) });
+  });
+
+  it("cross-org: foreign run/prompt returns empty", async () => {
+    expect(await tdb.listRunResponses(TEAM, foreignClientIdFor(), runId)).toEqual([]);
+    expect(await tdb.listRunResponses("tm_other_team", clientId, runId)).toEqual([]);
+    expect(await tdb.listPromptHistory("tm_other_team", clientId, promptId)).toEqual([]);
+  });
+
+  function foreignClientIdFor(): string {
+    return "tc_nonexistent";
+  }
+});
