@@ -98,10 +98,24 @@ const MD_COMPONENTS: Components = {
   ),
 };
 
+/** Slice markdown without leaving unclosed syntax to render literally. */
+function previewSlice(text: string): string {
+  let cut = text.slice(0, REPLY_PREVIEW_CHARS);
+  const lastSpace = cut.lastIndexOf(" ");
+  if (lastSpace > REPLY_PREVIEW_CHARS - 40) cut = cut.slice(0, lastSpace);
+  cut = cut.trimEnd();
+  // Drop an incomplete trailing [link](fragment
+  const lastOpen = cut.lastIndexOf("[");
+  if (lastOpen !== -1 && !cut.slice(lastOpen).includes(")")) cut = cut.slice(0, lastOpen).trimEnd();
+  // Close a mid-cut ** so it bolds to the end instead of showing literally
+  if ((cut.split("**").length - 1) % 2 === 1) cut += "**";
+  return `${cut}…`;
+}
+
 function ReplyText({ text, mentioned }: { text: string | null; mentioned: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const long = (text?.length ?? 0) > REPLY_PREVIEW_CHARS;
-  const shown = !text ? null : expanded || !long ? text : `${text.slice(0, REPLY_PREVIEW_CHARS).trimEnd()}…`;
+  const shown = !text ? null : expanded || !long ? text : previewSlice(text);
   return (
     <div style={{ fontSize: 13, lineHeight: 1.5, background: "#fafaf9", border: BORDER, borderRadius: 8, padding: "10px 12px" }}>
       {shown === null ? (
