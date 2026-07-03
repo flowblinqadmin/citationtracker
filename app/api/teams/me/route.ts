@@ -9,6 +9,6 @@ export async function GET() {
     teamId: ctx.teamId,
     teamName: ctx.teamName,
     creditBalance: ctx.creditBalance,
-    creditsPerPrompt: citationRunCredits(1),
+    creditsPerPrompt: citationRunCredits(1), // full run: 1 prompt × 3 models
   });
 }

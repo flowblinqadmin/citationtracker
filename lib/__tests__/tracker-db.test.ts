@@ -290,4 +290,70 @@ describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
   function foreignClientIdFor(): string {
     return "tc_nonexistent";
   }
+
+  describe("brand citation stats", () => {
+    beforeEach(async () => {
+      // Brand gets a domain + a competitor; seed citations for the run:
+      // 2 brand-domain (one exact, one subdomain), 1 competitor, 1 third-party.
+      await tdb.updateBrand(TEAM, clientId, {
+        domain: "acme.com",
+        competitors: [{ name: "Rival", domain: "rival.com" }],
+      });
+      const [version] = await db
+        .select()
+        .from(schema.trackerPromptVersions)
+        .where(eq(schema.trackerPromptVersions.promptId, promptId));
+      // Second response (another platform) with no brand citation.
+      await db.insert(schema.trackerResponses).values({
+        id: "resp_2", runId, clientId, promptVersionId: version.id,
+        platform: "google", attempt: 1, responseText: "…", citedUrls: [], brandMentioned: false,
+      });
+      // citations have no FK to runs (they survive geo's response purge), so
+      // they don't cascade with the org wipe — ids must be unique per test run.
+      const cite = (suffix: string, domain: string, platform: "openai" | "google") =>
+        db.insert(schema.trackerCitations).values({
+          id: `${runId}_${suffix}`, runId, clientId, promptVersionId: version.id, platform,
+          rawUrl: `https://${domain}/x`, normalizedUrl: `${domain}/x`, domain,
+          matchType: "unmatched",
+        });
+      await cite("cit_1", "acme.com", "openai");
+      await cite("cit_2", "docs.acme.com", "openai");
+      await cite("cit_3", "rival.com", "google");
+      await cite("cit_4", "wikipedia.org", "google");
+    });
+
+    it("counts totals, brand-domain (incl. subdomains), competitors, and per-reply rate", async () => {
+      const runs = await tdb.listRunsWithStats(TEAM, clientId);
+      const run = runs.find((r) => r.id === runId)!;
+      expect(run.citationStats).toEqual({
+        totalCitations: 4,
+        brandCitations: 2,
+        competitorCitations: 1,
+        // 1 of 2 answered (promptVersion × platform) pairs has a brand citation
+        brandCitationRate: 0.5,
+      });
+    });
+
+    it("rate is null when the brand has no domain", async () => {
+      await tdb.updateBrand(TEAM, clientId, { domain: "" });
+      const runs = await tdb.listRunsWithStats(TEAM, clientId);
+      const run = runs.find((r) => r.id === runId)!;
+      expect(run.citationStats.brandCitationRate).toBeNull();
+      expect(run.citationStats.brandCitations).toBe(0);
+      expect(run.citationStats.totalCitations).toBe(4);
+    });
+
+    it("lists a run's top cited domains", async () => {
+      const top = await tdb.getRunTopDomains(TEAM, clientId, runId);
+      expect(top[0]).toEqual({ domain: "acme.com", count: 1, brand: true });
+      expect(top).toHaveLength(4);
+      expect(top.find((d) => d.domain === "docs.acme.com")?.brand).toBe(true);
+      expect(top.find((d) => d.domain === "wikipedia.org")?.brand).toBe(false);
+    });
+
+    it("cross-org: stats and domains are empty for a foreign team", async () => {
+      expect(await tdb.listRunsWithStats("tm_other_team", clientId)).toEqual([]);
+      expect(await tdb.getRunTopDomains("tm_other_team", clientId, runId)).toEqual([]);
+    });
+  });
 });

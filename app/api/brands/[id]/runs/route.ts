@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTeamContext } from "@/lib/team";
-import { listRuns } from "@/lib/tracker-db";
+import { listRunsWithStats } from "@/lib/tracker-db";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const ctx = await getTeamContext();
   if (!ctx) return NextResponse.json({ error: "No team for this user" }, { status: 401 });
-  return NextResponse.json({ runs: await listRuns(ctx.teamId, (await params).id) });
+  return NextResponse.json({ runs: await listRunsWithStats(ctx.teamId, (await params).id) });
 }

@@ -47,13 +47,13 @@ export default function BrandListPage() {
 
   async function createBrand(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || !domain.trim()) return;
     setCreating(true);
     try {
       const res = await fetch(apiUrl("/api/brands"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), domain: domain.trim() || undefined }),
+        body: JSON.stringify({ name: name.trim(), domain: domain.trim() }),
       });
       if (!res.ok) {
         toast.error((await res.json()).error ?? "Could not create brand");
@@ -100,14 +100,14 @@ export default function BrandListPage() {
         <input
           value={domain}
           onChange={(e) => setDomain(e.target.value)}
-          placeholder="Domain (optional)"
+          placeholder="Domain (e.g. acme.com)"
           maxLength={253}
           style={{ flex: 1, padding: "10px 12px", border: BORDER, borderRadius: 8, fontSize: 14 }}
         />
         <button
           type="submit"
-          disabled={creating || !name.trim()}
-          style={{ padding: "10px 18px", background: ACCENT, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", opacity: creating || !name.trim() ? 0.5 : 1 }}
+          disabled={creating || !name.trim() || !domain.trim()}
+          style={{ padding: "10px 18px", background: ACCENT, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", opacity: creating || !name.trim() || !domain.trim() ? 0.5 : 1 }}
         >
           Add brand
         </button>

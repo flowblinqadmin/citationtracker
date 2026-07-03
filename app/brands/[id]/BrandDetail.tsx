@@ -38,6 +38,20 @@ interface Run {
   error: string | null;
   metrics: TrackerRunMetrics | null;
   scope: { promptVersionIds?: string[]; platforms?: string[] } | null;
+  // Brand-domain stats computed by this service (geo's metrics match a PCG
+  // article list we don't use — its citation figures are always 0 here).
+  citationStats?: {
+    totalCitations: number;
+    brandCitations: number;
+    competitorCitations: number;
+    brandCitationRate: number | null;
+  };
+}
+
+interface TopDomain {
+  domain: string;
+  count: number;
+  brand: boolean;
 }
 
 const CARD = "#ffffff";
@@ -258,6 +272,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
   const [replies, setReplies] = useState<Record<string, ReplyRow[]>>({});
   const [historyPromptId, setHistoryPromptId] = useState<string | null>(null);
   const [history, setHistory] = useState<Record<string, HistoryRow[]>>({});
+  const [topDomains, setTopDomains] = useState<Record<string, TopDomain[]>>({});
 
   const load = useCallback(async () => {
     const [brandRes, promptsRes, runsRes, teamRes] = await Promise.all([
@@ -303,6 +318,8 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
 
   const runCost = prompts.length > 0 ? citationRunCredits(prompts.length, selectedPlatforms.length) : 0;
   const singleCost = citationRunCredits(1, selectedPlatforms.length);
+  // Geo's cron always runs scheduled runs on all 3 models — unaffected by the picker.
+  const scheduledCost = prompts.length > 0 ? citationRunCredits(prompts.length) : 0;
   const inLibrary = new Set(prompts.map((p) => p.name));
 
   function togglePlatform(p: string) {
@@ -350,7 +367,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
     if (res.ok) {
       setBrand((await res.json()).brand);
       if (runFrequency !== "manual") {
-        toast.info(`Scheduled runs bill ~${runCost || citationRunCredits(1)} credits each, automatically.`);
+        toast.info(`Scheduled runs bill ~${scheduledCost || citationRunCredits(1)} credits each, automatically.`);
       }
     }
   }
@@ -364,6 +381,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
       if (res.ok) {
         const body = await res.json();
         setReplies((m) => ({ ...m, [latestCompleteId]: body.responses }));
+        setTopDomains((m) => ({ ...m, [latestCompleteId]: body.topDomains ?? [] }));
       }
     });
   }, [tab, latestCompleteId, clientId, replies]);
@@ -379,6 +397,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
       if (res.ok) {
         const body = await res.json();
         setReplies((m) => ({ ...m, [runId]: body.responses }));
+        setTopDomains((m) => ({ ...m, [runId]: body.topDomains ?? [] }));
       }
     }
   }
@@ -474,8 +493,8 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
               style={{ padding: "6px 8px", border: BORDER, borderRadius: 6 }}
             >
               <option value="manual">Manual only</option>
-              <option value="weekly">Weekly (~{runCost || "?"} credits/run)</option>
-              <option value="monthly">Monthly (~{runCost || "?"} credits/run)</option>
+              <option value="weekly">Weekly (~{scheduledCost || "?"} credits/run)</option>
+              <option value="monthly">Monthly (~{scheduledCost || "?"} credits/run)</option>
             </select>
           </label>
           <button
@@ -517,8 +536,14 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
           ) : (
             (() => {
               const m = latestComplete.metrics!;
+              const stats = latestComplete.citationStats;
+              const soav =
+                stats && stats.brandCitations + stats.competitorCitations > 0
+                  ? stats.brandCitations / (stats.brandCitations + stats.competitorCitations)
+                  : null;
               const trend = [...runs].filter((r) => r.status === "complete" && r.metrics).reverse();
               const latestReplies = replies[latestComplete.id];
+              const latestDomains = topDomains[latestComplete.id];
               const sentimentCounts = latestReplies ? tallySentiment(finalAttempts(latestReplies)) : null;
               return (
                 <div style={{ display: "grid", gap: 12 }}>
@@ -526,10 +551,14 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                     Latest complete run · {latestComplete.period} · {latestComplete.promptsTotal ?? "?"} prompt{latestComplete.promptsTotal === 1 ? "" : "s"}
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-                    <MetricCard label="Citation rate" value={pct(m.citationRate)} sub="prompts citing your pages" />
+                    <MetricCard
+                      label="Brand citation rate"
+                      value={stats?.brandCitationRate != null ? pct(stats.brandCitationRate) : "—"}
+                      sub={brand?.domain ? `replies citing ${brand.domain}` : "set a domain to track this"}
+                    />
                     <MetricCard label="Brand mentions" value={pct(m.brandMentionRate)} sub="replies naming the brand" />
-                    <MetricCard label="Share of AI voice" value={m.shareOfAiVoice != null ? pct(m.shareOfAiVoice) : "—"} sub="vs named competitors" />
-                    <MetricCard label="Citations" value={String(m.totalCitations)} sub="URLs cited in replies" />
+                    <MetricCard label="Share of AI voice" value={soav != null ? pct(soav) : "—"} sub="brand vs competitor citations" />
+                    <MetricCard label="Citations" value={String(stats?.totalCitations ?? 0)} sub="URLs cited in replies" />
                   </div>
 
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
@@ -547,10 +576,26 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                       )}
                     </div>
                     <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px", flex: "1 1 220px" }}>
-                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Citation-rate trend ({trend.length} runs)</div>
-                      <Sparkline values={trend.map((r) => r.metrics!.citationRate)} color={ACCENT} />
+                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Brand-citation trend ({trend.length} runs)</div>
+                      <Sparkline values={trend.map((r) => r.citationStats?.brandCitationRate ?? 0)} color={ACCENT} />
                     </div>
                   </div>
+
+                  {latestDomains && latestDomains.length > 0 && (
+                    <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
+                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Top cited sources (latest run)</div>
+                      <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
+                        {latestDomains.map((d) => (
+                          <div key={d.domain} style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ fontWeight: d.brand ? 700 : 400, color: d.brand ? GREEN : "inherit" }}>
+                              {d.domain}{d.brand ? " · you" : ""}
+                            </span>
+                            <span style={{ color: MUTED }}>{d.count}×</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {m.platformBreakdown?.length > 0 && (
                     <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
@@ -559,18 +604,14 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                         <thead>
                           <tr style={{ color: MUTED, textAlign: "left" }}>
                             <th style={{ fontWeight: 400, paddingBottom: 6 }}>Platform</th>
-                            <th style={{ fontWeight: 400 }}>Citation rate</th>
                             <th style={{ fontWeight: 400 }}>Brand mentions</th>
-                            <th style={{ fontWeight: 400 }}>Citations</th>
                           </tr>
                         </thead>
                         <tbody>
                           {m.platformBreakdown.map((p) => (
                             <tr key={p.platform} style={{ borderTop: BORDER }}>
                               <td style={{ padding: "6px 0" }}>{PLATFORM_LABEL[p.platform] ?? p.platform}</td>
-                              <td><strong>{pct(p.citationRate)}</strong></td>
-                              <td>{pct(p.brandMentionRate)}</td>
-                              <td>{p.totalCitations}</td>
+                              <td><strong>{pct(p.brandMentionRate)}</strong></td>
                             </tr>
                           ))}
                         </tbody>
@@ -733,11 +774,11 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                 </span>
               </div>
               {r.metrics && (
-                <div style={{ display: "flex", gap: 24, marginTop: 10, fontSize: 13 }}>
-                  <span>Citation rate <strong>{pct(r.metrics.citationRate)}</strong></span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 24, marginTop: 10, fontSize: 13 }}>
+                  <span>Brand cited <strong>{r.citationStats?.brandCitationRate != null ? pct(r.citationStats.brandCitationRate) : "—"}</strong></span>
                   <span>Brand mentions <strong>{pct(r.metrics.brandMentionRate)}</strong></span>
-                  <span>Share of AI voice <strong>{r.metrics.shareOfAiVoice != null ? pct(r.metrics.shareOfAiVoice) : "—"}</strong></span>
-                  <span>Citations <strong>{r.metrics.totalCitations}</strong></span>
+                  <span>Brand citations <strong>{r.citationStats?.brandCitations ?? 0}</strong></span>
+                  <span>All citations <strong>{r.citationStats?.totalCitations ?? 0}</strong></span>
                 </div>
               )}
               {r.error && <div style={{ marginTop: 8, fontSize: 12, color: RED }}>{r.error}</div>}

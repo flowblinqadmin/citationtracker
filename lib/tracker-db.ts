@@ -12,6 +12,7 @@ import {
   trackerPromptVersions,
   trackerRuns,
   trackerResponses,
+  trackerCitations,
   type TrackerClient,
   type TrackerRun,
 } from "@/lib/db/schema";
@@ -22,7 +23,7 @@ import type {
   TrackerRunFrequency,
   TrackerRunScope,
 } from "@/lib/types/tracker";
-import { and, asc, desc, eq, gte, inArray, like } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, like, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
 const MAX_ACTIVE_PROMPTS = 30;
@@ -261,6 +262,116 @@ export async function listRuns(teamId: string, clientId: string): Promise<Tracke
     .where(eq(trackerRuns.clientId, clientId))
     .orderBy(desc(trackerRuns.createdAt))
     .limit(50); // the UI shows recent history; metrics blobs make rows heavy
+}
+
+/**
+ * Brand-centric citation stats for a run. Geo's stored run.metrics match
+ * citations against a PCG-style press-article list this service doesn't use
+ * (everything lands "unmatched" → 0s), so citation figures are computed here
+ * from tracker.citations by the brand's own domain instead.
+ */
+export interface RunCitationStats {
+  totalCitations: number;      // every cited URL captured for the run
+  brandCitations: number;      // citations of the brand's domain (incl. subdomains)
+  competitorCitations: number; // citations of named competitor domains
+  brandCitationRate: number | null; // fraction of answered replies citing the brand; null without a domain
+}
+
+export type RunWithStats = TrackerRun & { citationStats: RunCitationStats };
+
+const stripWww = (domain: string) => domain.trim().toLowerCase().replace(/^www\./, "");
+
+/** `domain = d OR domain LIKE '%.d'` — matches the domain and its subdomains. */
+const domainMatch = (column: typeof trackerCitations.domain, domain: string) =>
+  sql`(${column} = ${domain} OR ${column} LIKE ${"%." + domain})`;
+
+export async function listRunsWithStats(teamId: string, clientId: string): Promise<RunWithStats[]> {
+  const brand = await getBrand(teamId, clientId);
+  if (!brand) return [];
+  const runs = await listRuns(teamId, clientId);
+  if (runs.length === 0) return [];
+
+  const runIds = runs.map((r) => r.id);
+  const brandDomain = brand.domain ? stripWww(brand.domain) : null;
+  const competitorDomains = (brand.competitors ?? []).map((c) => stripWww(c.domain)).filter(Boolean);
+
+  const brandCond = brandDomain ? domainMatch(trackerCitations.domain, brandDomain) : sql`false`;
+  const compCond = competitorDomains.length
+    ? sql.join(competitorDomains.map((d) => domainMatch(trackerCitations.domain, d)), sql` OR `)
+    : sql`false`;
+
+  const citeRows = await db
+    .select({
+      runId: trackerCitations.runId,
+      total: sql<number>`count(*)::int`,
+      brand: sql<number>`count(*) filter (where ${brandCond})::int`,
+      competitor: sql<number>`count(*) filter (where (${compCond}))::int`,
+      brandPairs: sql<number>`count(distinct (${trackerCitations.promptVersionId}, ${trackerCitations.platform})) filter (where ${brandCond})::int`,
+    })
+    .from(trackerCitations)
+    .where(and(inArray(trackerCitations.runId, runIds), eq(trackerCitations.clientId, clientId)))
+    .groupBy(trackerCitations.runId);
+
+  const pairRows = await db
+    .select({
+      runId: trackerResponses.runId,
+      pairs: sql<number>`count(distinct (${trackerResponses.promptVersionId}, ${trackerResponses.platform}))::int`,
+    })
+    .from(trackerResponses)
+    .where(and(inArray(trackerResponses.runId, runIds), eq(trackerResponses.clientId, clientId)))
+    .groupBy(trackerResponses.runId);
+
+  const cites = new Map(citeRows.map((r) => [r.runId, r]));
+  const pairs = new Map(pairRows.map((r) => [r.runId, r.pairs]));
+
+  return runs.map((run) => {
+    const c = cites.get(run.id);
+    const answered = pairs.get(run.id) ?? 0;
+    return {
+      ...run,
+      citationStats: {
+        totalCitations: c?.total ?? 0,
+        brandCitations: c?.brand ?? 0,
+        competitorCitations: c?.competitor ?? 0,
+        brandCitationRate:
+          brandDomain && answered > 0 ? (c?.brandPairs ?? 0) / answered : null,
+      },
+    };
+  });
+}
+
+export interface TopDomain {
+  domain: string;
+  count: number;
+  brand: boolean;
+}
+
+/** A run's most-cited domains, brand-flagged, most-cited first. */
+export async function getRunTopDomains(
+  teamId: string,
+  clientId: string,
+  runId: string,
+  limit = 10,
+): Promise<TopDomain[]> {
+  const brand = await getBrand(teamId, clientId);
+  if (!brand) return [];
+  const brandDomain = brand.domain ? stripWww(brand.domain) : null;
+  const rows = await db
+    .select({
+      domain: trackerCitations.domain,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(trackerCitations)
+    .where(and(eq(trackerCitations.runId, runId), eq(trackerCitations.clientId, clientId)))
+    .groupBy(trackerCitations.domain)
+    .orderBy(sql`count(*) desc`, asc(trackerCitations.domain))
+    .limit(limit);
+  return rows
+    .filter((r) => r.domain !== "")
+    .map((r) => ({
+      ...r,
+      brand: !!brandDomain && (r.domain === brandDomain || r.domain.endsWith(`.${brandDomain}`)),
+    }));
 }
 
 export type ManualRunResult =

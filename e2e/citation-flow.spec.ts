@@ -21,6 +21,7 @@ test("basePath smoke: app serves under /citations with a valid session", async (
 test("create brand → add prompts → cost preview", async ({ page }) => {
   await page.goto("/citations");
   await page.getByPlaceholder("Brand name (e.g. Acme)").fill(brandName);
+  await page.getByPlaceholder("Domain (e.g. acme.com)").fill("acme-e2e.com");
   await page.getByRole("button", { name: "Add brand" }).click();
   await page.getByRole("link", { name: new RegExp(brandName) }).click();
 
@@ -33,8 +34,8 @@ test("create brand → add prompts → cost preview", async ({ page }) => {
   await page.getByRole("button", { name: "Add custom" }).click();
   await expect(page.getByText("Which citation trackers do PR teams use?")).toBeVisible();
 
-  // 1 credit per prompt, flat: 2 prompts → 2 credits.
-  await expect(page.getByRole("button", { name: /Run now · 2 credits/ })).toBeVisible();
+  // 1 credit per prompt per model: 2 prompts × 3 models → 6 credits.
+  await expect(page.getByRole("button", { name: /Run now · 6 credits/ })).toBeVisible();
 });
 
 test("run now debits credits and completes with metrics", async ({ page }) => {
@@ -42,17 +43,17 @@ test("run now debits credits and completes with metrics", async ({ page }) => {
   await page.getByRole("link", { name: new RegExp(brandName) }).click();
   await page.getByRole("button", { name: /Run now/ }).click();
 
-  await expect(page.getByText(/Run started — 2 credits/)).toBeVisible({ timeout: 15_000 }); // dev-server route compile on first hit
+  await expect(page.getByText(/Run started — 6 credits/)).toBeVisible({ timeout: 15_000 }); // dev-server route compile on first hit
   await expect(page.getByText("pending").or(page.getByText("running"))).toBeVisible();
-  expect(await getBalance()).toBe(18);
+  expect(await getBalance()).toBe(14);
 
   // Simulate geo's worker finishing; the 5s poll should surface metrics.
   const runId = await latestRunId();
   expect(runId).toBeTruthy();
   await completeRun(runId!);
   await expect(page.getByText("complete")).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("Citation rate")).toBeVisible();
-  await expect(page.getByText("75%")).toBeVisible(); // share of AI voice
+  await expect(page.getByText("Brand mentions")).toBeVisible();
+  await expect(page.getByText("100%")).toBeVisible(); // brand mention rate from seeded metrics
 });
 
 test("insufficient credits → 402 upsell, no charge", async ({ page }) => {

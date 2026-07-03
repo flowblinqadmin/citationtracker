@@ -67,10 +67,16 @@ https://geo.flowblinq.com) and its database. Verified against prod 2026-07-03.
 
 ## Credits & pricing
 
-- Flat 1 credit per prompt per run (1 credit = $0.10) — platform selection
-  scopes execution, never the price. 1 prompt = 1 credit, 30 prompts = 30.
-  Constants in `lib/pricing.ts`; a margin test asserts the credit still covers
-  worst-case 3-platform cost × 1.3 (`MODEL_COST_ESTIMATES` — review quarterly).
+- Flat 1 credit per prompt PER MODEL (1 credit = $0.10). Full 3-model run of
+  1 prompt = 3 credits; 1 prompt × 1 model = 1 credit. Constants in
+  `lib/pricing.ts`; a margin test asserts a credit covers the priciest model's
+  cost × 1.3 (`MODEL_COST_ESTIMATES` — review quarterly).
+- Brand domains are REQUIRED at creation: geo's `isBrandMentioned` returns
+  false without a domain (mentions + sentiment dead), and citation stats key
+  on it. Citation figures shown in the UI come from `listRunsWithStats` /
+  `getRunTopDomains` (brand-domain matching over tracker.citations) — geo's
+  stored run.metrics citation numbers match a PCG article list this service
+  doesn't use and are always 0 here (only brandMentionRate is reused).
 - Manual runs debit upfront (402 gate). Scheduled runs are debited post-hoc by
   `/api/cron/reconcile` (balance may go negative → manual runs blocked).
   Failed runs refunded; revived-after-refund runs re-debited.

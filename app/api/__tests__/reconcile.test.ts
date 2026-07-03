@@ -23,7 +23,7 @@ describe.skipIf(!dbUrl)("GET /api/cron/reconcile (Postgres)", () => {
     await db.execute(sql`DELETE FROM tracker.orgs`);
     await db.delete(schema.creditTransactions).where(eq(schema.creditTransactions.teamId, TEAM));
     await db.delete(schema.teams).where(eq(schema.teams.id, TEAM));
-    await db.insert(schema.teams).values({ id: TEAM, name: "Reconcile", ownerUserId: "u", creditBalance: 20 });
+    await db.insert(schema.teams).values({ id: TEAM, name: "Reconcile", ownerUserId: "u", creditBalance: 100 });
     await db.execute(sql`INSERT INTO tracker.orgs (id, name) VALUES (${ORG}, 'Reconcile')`);
     await db.execute(sql`INSERT INTO tracker.clients (id, org_id, name) VALUES ('tc_rec', ${ORG}, 'Brand')`);
   });
@@ -47,14 +47,14 @@ describe.skipIf(!dbUrl)("GET /api/cron/reconcile (Postgres)", () => {
     expect(res.status).toBe(401);
   });
 
-  it("debits an uncharged scheduled run post-hoc (10 prompts → 10 credits)", async () => {
+  it("debits an uncharged scheduled run post-hoc (10 prompts × 3 models → 30 credits)", async () => {
     await seedRun("complete");
     const res = await call();
     expect((await res.json()).debited).toBe(1);
-    expect(await balance()).toBe(10);
+    expect(await balance()).toBe(70);
   });
 
-  it("prices an uncharged SCOPED run per prompt like any other (10 prompts → 10 credits)", async () => {
+  it("prices an uncharged SCOPED run per prompt like any other (10 prompts × 3 models → 30 credits)", async () => {
     const id = `tr_rec_scoped_${runSeq++}`;
     await db.execute(sql`
       INSERT INTO tracker.runs (id, client_id, org_id, period, kind, status, prompts_total, scope)
@@ -62,8 +62,8 @@ describe.skipIf(!dbUrl)("GET /api/cron/reconcile (Postgres)", () => {
     `);
     const res = await call();
     expect((await res.json()).debited).toBe(1);
-    // platform scope narrows execution, not price: 10 prompts → 10 credits
-    expect(await balance()).toBe(10);
+    // per prompt × per model: 10 prompts × 1 platform → 10 credits
+    expect(await balance()).toBe(90);
   });
 
   it("is idempotent — a second pass changes nothing", async () => {
@@ -71,31 +71,31 @@ describe.skipIf(!dbUrl)("GET /api/cron/reconcile (Postgres)", () => {
     await call();
     const second = await (await call()).json();
     expect(second).toMatchObject({ debited: 0, refunded: 0, redebited: 0 });
-    expect(await balance()).toBe(10);
+    expect(await balance()).toBe(70);
   });
 
   it("drives the balance negative rather than skipping billing", async () => {
     await db.update(schema.teams).set({ creditBalance: 1 }).where(eq(schema.teams.id, TEAM));
     await seedRun("complete");
     await call();
-    expect(await balance()).toBe(-9);
+    expect(await balance()).toBe(-29);
   });
 
   it("refunds a charged run that failed", async () => {
     const runId = await seedRun("running");
     await call(); // debit while running
-    expect(await balance()).toBe(10);
+    expect(await balance()).toBe(70);
     await db.execute(sql`UPDATE tracker.runs SET status = 'failed' WHERE id = ${runId}`);
     const res = await (await call()).json();
     expect(res.refunded).toBe(1);
-    expect(await balance()).toBe(20);
+    expect(await balance()).toBe(100);
   });
 
   it("never charges an uncharged failed run", async () => {
     await seedRun("failed");
     const res = await (await call()).json();
     expect(res).toMatchObject({ debited: 0, refunded: 0 });
-    expect(await balance()).toBe(20);
+    expect(await balance()).toBe(100);
   });
 
   it("re-debits a refunded run that geo revived and completed", async () => {
@@ -103,11 +103,11 @@ describe.skipIf(!dbUrl)("GET /api/cron/reconcile (Postgres)", () => {
     await call(); // debit
     await db.execute(sql`UPDATE tracker.runs SET status = 'failed' WHERE id = ${runId}`);
     await call(); // refund
-    expect(await balance()).toBe(20);
+    expect(await balance()).toBe(100);
     await db.execute(sql`UPDATE tracker.runs SET status = 'complete' WHERE id = ${runId}`);
     const res = await (await call()).json();
     expect(res.redebited).toBe(1);
-    expect(await balance()).toBe(10);
+    expect(await balance()).toBe(70);
     // And it stays settled on the next pass.
     const final = await (await call()).json();
     expect(final).toMatchObject({ debited: 0, refunded: 0, redebited: 0 });
@@ -117,7 +117,7 @@ describe.skipIf(!dbUrl)("GET /api/cron/reconcile (Postgres)", () => {
     await seedRun("complete", null);
     const res = await (await call()).json();
     expect(res).toMatchObject({ debited: 0, skipped: 1 });
-    expect(await balance()).toBe(20);
+    expect(await balance()).toBe(100);
   });
 
   it("never touches runs in non-team orgs (PCG)", async () => {

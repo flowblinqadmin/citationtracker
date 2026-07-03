@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   MODEL_COST_ESTIMATES,
   CITATION_EXEC_MARGIN,
-  CREDITS_PER_PROMPT,
+  CREDITS_PER_PROMPT_MODEL,
   CREDIT_USD,
   citationRunCredits,
   debitForRun,
@@ -20,21 +20,17 @@ import { teams, creditTransactions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 describe("citationRunCredits", () => {
-  it("charges 1 credit per prompt, flat", () => {
-    expect(citationRunCredits(1)).toBe(1);
-    expect(citationRunCredits(2)).toBe(2);
-    expect(citationRunCredits(30)).toBe(30);
-  });
-
-  it("platform selection scopes execution but never changes the price", () => {
+  it("charges 1 credit per prompt per model", () => {
     expect(citationRunCredits(1, 1)).toBe(1);
-    expect(citationRunCredits(30, 1)).toBe(citationRunCredits(30, 3));
+    expect(citationRunCredits(1)).toBe(3); // all 3 models
+    expect(citationRunCredits(2)).toBe(6);
+    expect(citationRunCredits(10, 1)).toBe(10);
+    expect(citationRunCredits(30)).toBe(90);
   });
 
-  it("keeps the per-prompt price ≥ worst-case cost × margin", () => {
-    const worstCaseUsd =
-      Object.values(MODEL_COST_ESTIMATES).reduce((a, b) => a + b, 0) * CITATION_EXEC_MARGIN;
-    expect(CREDITS_PER_PROMPT * CREDIT_USD).toBeGreaterThanOrEqual(worstCaseUsd);
+  it("keeps the per-prompt-model price ≥ the priciest model's cost × margin", () => {
+    const priciestUsd = Math.max(...Object.values(MODEL_COST_ESTIMATES)) * CITATION_EXEC_MARGIN;
+    expect(CREDITS_PER_PROMPT_MODEL * CREDIT_USD).toBeGreaterThanOrEqual(priciestUsd);
   });
 
   it("rejects non-positive prompt counts", () => {
