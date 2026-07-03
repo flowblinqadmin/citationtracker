@@ -34,8 +34,8 @@ test("create brand → add prompts → cost preview", async ({ page }) => {
   await page.getByRole("button", { name: "Add custom" }).click();
   await expect(page.getByText("Which citation trackers do PR teams use?")).toBeVisible();
 
-  // 1 credit per prompt per model: 2 prompts × 3 models → 6 credits.
-  await expect(page.getByRole("button", { name: /Run now · 6 credits/ })).toBeVisible();
+  // 1 credit per prompt per model: 2 prompts × 4 models → 8 credits.
+  await expect(page.getByRole("button", { name: /Run now · 8 credits/ })).toBeVisible();
 });
 
 test("run now debits credits and completes with metrics", async ({ page }) => {
@@ -43,9 +43,9 @@ test("run now debits credits and completes with metrics", async ({ page }) => {
   await page.getByRole("link", { name: new RegExp(brandName) }).click();
   await page.getByRole("button", { name: /Run now/ }).click();
 
-  await expect(page.getByText(/Run started — 6 credits/)).toBeVisible({ timeout: 15_000 }); // dev-server route compile on first hit
+  await expect(page.getByText(/Run started — 8 credits/)).toBeVisible({ timeout: 15_000 }); // dev-server route compile on first hit
   await expect(page.getByText("pending").or(page.getByText("running"))).toBeVisible();
-  expect(await getBalance()).toBe(14);
+  expect(await getBalance()).toBe(12);
 
   // Simulate geo's worker finishing; the 5s poll should surface metrics.
   const runId = await latestRunId();

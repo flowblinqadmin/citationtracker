@@ -46,9 +46,9 @@ export async function GET(req: NextRequest) {
     if (!hasDebit && run.status !== "failed") {
       if (!run.promptsTotal) { skipped++; continue; } // can't price without a prompt count
       // Per prompt × per model: scoped runs bill for their platform subset;
-      // malformed scope prices as a full 3-platform run.
+      // malformed scope prices as a full 4-platform run.
       const scoped = run.scope?.platforms?.length;
-      const credits = citationRunCredits(run.promptsTotal, scoped && scoped <= 3 ? scoped : 3);
+      const credits = citationRunCredits(run.promptsTotal, scoped && scoped <= 4 ? scoped : 4);
       const r = await debitForRun(teamId, run.id, credits, { allowNegative: true });
       if (r.applied) debited++;
       continue;

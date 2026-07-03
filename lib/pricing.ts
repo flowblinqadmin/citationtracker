@@ -1,10 +1,10 @@
 // Pure pricing — NO server imports (client components use this for cost
 // previews; lib/credits.ts uses it for actual billing).
 //
-// Pricing is flat: 1 credit per prompt PER MODEL queried. A full 3-platform
-// run of one prompt = 3 credits; scoping to one model = 1 credit. Simple to
-// predict, and comfortably above cost: the priciest execution (perplexity)
-// is ~$0.013 vs the $0.10 a credit sells for.
+// Pricing is flat: 1 credit per prompt PER MODEL queried. A full 4-platform
+// run of one prompt = 4 credits; scoping to one model = 1 credit. Simple to
+// predict, and comfortably above cost: the priciest execution (claude +
+// web searches, ~$0.026) is well under the $0.10 a credit sells for.
 
 // Estimated USD cost of one prompt-execution (1 prompt × 1 model, ~1k tokens
 // out). Perplexity dominates via per-search fees. Review quarterly against
@@ -14,11 +14,12 @@ export const MODEL_COST_ESTIMATES = {
   openai: 0.002,     // gpt-5.4-mini
   perplexity: 0.010, // sonar (incl. search fee)
   google: 0.001,     // gemini flash
+  anthropic: 0.026,  // claude-haiku-4.5 + up to 2 web searches ($0.01 each)
 } as const;
 
 export const CITATION_EXEC_MARGIN = 1.3;
 export const CREDIT_USD = 0.1; // geo: $10 per 100-credit pack
-const ALL_PLATFORM_COUNT = 3;
+const ALL_PLATFORM_COUNT = 4;
 
 /** Flat price: 1 credit per prompt per model queried. */
 export const CREDITS_PER_PROMPT_MODEL = 1;

@@ -47,14 +47,14 @@ describe.skipIf(!dbUrl)("GET /api/cron/reconcile (Postgres)", () => {
     expect(res.status).toBe(401);
   });
 
-  it("debits an uncharged scheduled run post-hoc (10 prompts × 3 models → 30 credits)", async () => {
+  it("debits an uncharged scheduled run post-hoc (10 prompts × 4 models → 40 credits)", async () => {
     await seedRun("complete");
     const res = await call();
     expect((await res.json()).debited).toBe(1);
-    expect(await balance()).toBe(70);
+    expect(await balance()).toBe(60);
   });
 
-  it("prices an uncharged SCOPED run per prompt like any other (10 prompts × 3 models → 30 credits)", async () => {
+  it("prices an uncharged SCOPED run per prompt like any other (10 prompts × 4 models → 40 credits)", async () => {
     const id = `tr_rec_scoped_${runSeq++}`;
     await db.execute(sql`
       INSERT INTO tracker.runs (id, client_id, org_id, period, kind, status, prompts_total, scope)
@@ -71,20 +71,20 @@ describe.skipIf(!dbUrl)("GET /api/cron/reconcile (Postgres)", () => {
     await call();
     const second = await (await call()).json();
     expect(second).toMatchObject({ debited: 0, refunded: 0, redebited: 0 });
-    expect(await balance()).toBe(70);
+    expect(await balance()).toBe(60);
   });
 
   it("drives the balance negative rather than skipping billing", async () => {
     await db.update(schema.teams).set({ creditBalance: 1 }).where(eq(schema.teams.id, TEAM));
     await seedRun("complete");
     await call();
-    expect(await balance()).toBe(-29);
+    expect(await balance()).toBe(-39);
   });
 
   it("refunds a charged run that failed", async () => {
     const runId = await seedRun("running");
     await call(); // debit while running
-    expect(await balance()).toBe(70);
+    expect(await balance()).toBe(60);
     await db.execute(sql`UPDATE tracker.runs SET status = 'failed' WHERE id = ${runId}`);
     const res = await (await call()).json();
     expect(res.refunded).toBe(1);
@@ -107,7 +107,7 @@ describe.skipIf(!dbUrl)("GET /api/cron/reconcile (Postgres)", () => {
     await db.execute(sql`UPDATE tracker.runs SET status = 'complete' WHERE id = ${runId}`);
     const res = await (await call()).json();
     expect(res.redebited).toBe(1);
-    expect(await balance()).toBe(70);
+    expect(await balance()).toBe(60);
     // And it stays settled on the next pass.
     const final = await (await call()).json();
     expect(final).toMatchObject({ debited: 0, refunded: 0, redebited: 0 });

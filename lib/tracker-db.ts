@@ -652,7 +652,7 @@ export type ManualRunResult =
   | { kind: "invalid_scope"; message: string }
   | { kind: "not_found" };
 
-const ALL_PLATFORMS: TrackerPlatform[] = ["openai", "perplexity", "google"];
+const ALL_PLATFORMS: TrackerPlatform[] = ["openai", "perplexity", "google", "anthropic"];
 
 /** Prompt subset (by prompt identity) and/or platform subset for a manual run. */
 export interface ManualRunScopeInput {

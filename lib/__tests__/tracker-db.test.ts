@@ -188,7 +188,7 @@ describe.skipIf(!dbUrl)("tracker-db (Postgres)", () => {
         const r = await tdb.createManualRunRow(TEAM, clientId, { promptIds: [secondPromptId] });
         if (r.kind !== "run") throw new Error(`expected run, got ${r.kind}`);
         expect(r.promptCount).toBe(1);
-        expect(r.platformCount).toBe(3);
+        expect(r.platformCount).toBe(4);
         expect(r.run.promptsTotal).toBe(1);
         expect(r.run.scope?.promptVersionIds).toHaveLength(1);
         const prompts = await tdb.listPrompts(TEAM, clientId);
@@ -211,9 +211,9 @@ describe.skipIf(!dbUrl)("tracker-db (Postgres)", () => {
       });
 
       it("all platforms selected normalizes to no platform filter", async () => {
-        const r = await tdb.createManualRunRow(TEAM, clientId, { platforms: ["google", "openai", "perplexity", "google"] });
+        const r = await tdb.createManualRunRow(TEAM, clientId, { platforms: ["google", "openai", "perplexity", "anthropic", "google"] });
         if (r.kind !== "run") throw new Error(`expected run, got ${r.kind}`);
-        expect(r.platformCount).toBe(3);
+        expect(r.platformCount).toBe(4);
         expect(r.run.scope).toBeNull();
       });
 

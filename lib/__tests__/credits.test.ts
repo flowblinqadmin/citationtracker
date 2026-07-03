@@ -22,10 +22,10 @@ import { eq } from "drizzle-orm";
 describe("citationRunCredits", () => {
   it("charges 1 credit per prompt per model", () => {
     expect(citationRunCredits(1, 1)).toBe(1);
-    expect(citationRunCredits(1)).toBe(3); // all 3 models
-    expect(citationRunCredits(2)).toBe(6);
+    expect(citationRunCredits(1)).toBe(4); // all 4 models (incl. Claude)
+    expect(citationRunCredits(2)).toBe(8);
     expect(citationRunCredits(10, 1)).toBe(10);
-    expect(citationRunCredits(30)).toBe(90);
+    expect(citationRunCredits(30)).toBe(120);
   });
 
   it("keeps the per-prompt-model price ≥ the priciest model's cost × margin", () => {
@@ -38,9 +38,9 @@ describe("citationRunCredits", () => {
     expect(() => citationRunCredits(-1)).toThrow();
   });
 
-  it("rejects platform counts outside 1–3", () => {
+  it("rejects platform counts outside 1–4", () => {
     expect(() => citationRunCredits(1, 0)).toThrow();
-    expect(() => citationRunCredits(1, 4)).toThrow();
+    expect(() => citationRunCredits(1, 5)).toThrow();
     expect(() => citationRunCredits(1, 1.5)).toThrow();
   });
 });

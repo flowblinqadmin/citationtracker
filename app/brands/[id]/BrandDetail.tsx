@@ -118,8 +118,8 @@ interface HistoryRow {
   sentiment: string | null;
 }
 
-const PLATFORM_LABEL: Record<string, string> = { openai: "ChatGPT", perplexity: "Perplexity", google: "Gemini" };
-const PLATFORM_ORDER = ["openai", "perplexity", "google"];
+const PLATFORM_LABEL: Record<string, string> = { openai: "ChatGPT", perplexity: "Perplexity", google: "Gemini", anthropic: "Claude" };
+const PLATFORM_ORDER = ["openai", "perplexity", "google", "anthropic"];
 
 const SENTIMENT_STYLE: Record<string, { color: string; bg: string; label: string }> = {
   positive: { color: GREEN, bg: "#f0fdf4", label: "positive" },

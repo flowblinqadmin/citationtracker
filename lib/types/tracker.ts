@@ -1,8 +1,8 @@
 // Mirror of geo's lib/types/tracker.ts (deployed ref origin/main) — the shapes
 // stored in the shared tracker tables. Keep in lockstep with geo.
 
-/** Platforms queried each run by geo's worker. */
-export type TrackerPlatform = "perplexity" | "openai" | "google";
+/** Platforms queried each run by geo's worker (team-org runs include Claude). */
+export type TrackerPlatform = "perplexity" | "openai" | "google" | "anthropic";
 
 export type TrackerPromptCategory =
   | "brand"
