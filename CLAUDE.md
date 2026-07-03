@@ -97,6 +97,16 @@ bot walls; markdown matched with link targets stripped). `FIRECRAWL_API_KEY`
 in Vercel env (from geo's account). UI: dead links dropped, `no_mention`
 badged, per-model attribution on top cited pages.
 
+## AI Search (Google AI Overview)
+
+Hourly cron `/api/cron/ai-search`: each active team prompt is run as a Google
+query via a Firecrawl SERP scrape; `lib/ai-search.ts` parses the AI Overview
+block (line-start "AI Overview" heading only — the "not available" banner and
+inline phrases must not match), brand mention (visible text), and cited
+sources. Snapshots in `ai_search_snapshots` (service-owned), re-checked
+daily; latest per prompt is served at `/api/brands/[id]/ai-search` and shown
+in the Overview panel.
+
 ## Auth
 
 Login lives on geo. Same origin (path routing) → the shared Supabase session
