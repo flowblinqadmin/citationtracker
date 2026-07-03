@@ -4,11 +4,13 @@ import { NextResponse, type NextRequest } from "next/server";
 const DEBUG = process.env.NODE_ENV === "development";
 
 export async function updateSession(request: NextRequest) {
-  // Strip any client-supplied auth headers before we set our own
+  // Strip any client-supplied auth headers before we set our own. authorization
+  // is stripped too — nothing downstream may authenticate from it.
   request.headers.delete("x-user-id");
   request.headers.delete("x-user-email");
   request.headers.delete("x-supabase-token");
   request.headers.delete("x-token-exp");
+  request.headers.delete("authorization");
 
   const { pathname } = request.nextUrl;
 
