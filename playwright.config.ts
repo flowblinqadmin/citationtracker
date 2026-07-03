@@ -17,17 +17,18 @@ Object.assign(process.env, LOCAL_ENV);
 
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/helpers/global-setup.ts",
   fullyParallel: false,
   retries: 0,
   reporter: [["list"]],
   use: {
-    baseURL: "http://127.0.0.1:3050/citations",
+    baseURL: "http://127.0.0.1:3050",
     trace: "retain-on-failure",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command: "npx next dev -p 3050",
-    url: "http://127.0.0.1:3050/citations",
+    url: "http://127.0.0.1:3050/citations/icon.svg", // public path — pages 307 to login unauthenticated
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     env: LOCAL_ENV,

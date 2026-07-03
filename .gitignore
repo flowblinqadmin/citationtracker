@@ -29,3 +29,8 @@ hsec_*
 # Supabase local
 supabase/.temp/
 supabase/.branches/
+
+# Test artifacts
+.playwright/
+test-results/
+playwright-report/

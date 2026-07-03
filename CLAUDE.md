@@ -11,12 +11,26 @@ Postgres are the backend; this repo copies no backend logic.**
 npm run dev          # Next.js dev server
 npm run typecheck    # tsc --noEmit — the real type gate (build ignores errors)
 npm run lint         # ESLint
-npm test             # Vitest (or in Docker: docker build -f Dockerfile.test -t cite-test . && docker run --rm cite-test)
-npm run test:e2e     # Playwright (needs local Supabase + Postgres)
+npm test             # Vitest — DB-backed tests need TEST_DATABASE_URL (see below)
+npm run test:e2e     # Playwright — needs geo's local Supabase running (see below)
 npx knip             # unused files/deps/exports — must be clean
 ```
 
 Node path on this machine: `/opt/homebrew/bin/node`.
+
+### Test databases
+
+- **Unit/DB suite**: `TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54329/postgres npm test`.
+  Bring one up with `docker run -d --name cite-test-pg -e POSTGRES_PASSWORD=postgres -p 54329:5432 postgres:16-alpine`,
+  then apply `lib/db/test-schema.sql` + `lib/db/migrations/*.sql` with psql. Without
+  TEST_DATABASE_URL the DB-backed tests skip (calculator/middleware/gate tests still run).
+- **E2E**: uses **geo's local Supabase stack** (`supabase start` in ../geo — GoTrue :54321,
+  Postgres :54322), mirroring production's shared-project model. Apply the same two SQL
+  files to :54322 once. Playwright seeds its own user/team and signs in through
+  @supabase/ssr so the cookies match what the middleware reads.
+- The drift test (`lib/db/__tests__/schema-drift.test.ts`) compares the schema mirror
+  against whatever TEST_DATABASE_URL points to — point it at prod (read-only) for the
+  pre-deploy check.
 
 ## Geo contract (pinned — verify before changing anything here)
 

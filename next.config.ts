@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Multi-zone: geo.flowblinq.com rewrites /citations/* to this deployment.
+  // NEXT_PUBLIC_BASE_PATH feeds lib/api-url.ts (raw client fetch() calls are
+  // not auto-prefixed by Next).
+  basePath: "/citations",
+  env: { NEXT_PUBLIC_BASE_PATH: "/citations" },
   images: { unoptimized: true },
   async headers() {
     const csp = [

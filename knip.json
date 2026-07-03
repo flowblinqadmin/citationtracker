@@ -1,5 +1,5 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["app/**/*.{ts,tsx}", "**/*.test.ts"],
+  "entry": ["app/**/*.{ts,tsx}", "**/*.test.ts", "e2e/**/*.{ts,tsx}"],
   "ignoreExportsUsedInFile": { "interface": true, "type": true }
 }
