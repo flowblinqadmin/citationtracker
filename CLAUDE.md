@@ -67,11 +67,10 @@ https://geo.flowblinq.com) and its database. Verified against prod 2026-07-03.
 
 ## Credits & pricing
 
-- Flat price per prompt-execution = most-expensive-model cost × 1.3, in geo
-  credits (1 credit = $0.10), × the SELECTED platform count (runs can scope to
-  a subset of prompts/platforms; 1 prompt × 1 model = 1 credit, 30 × 3 = 12).
-  Constants in `lib/pricing.ts` (`MODEL_COST_ESTIMATES` — review quarterly
-  against provider pricing).
+- Flat 1 credit per prompt per run (1 credit = $0.10) — platform selection
+  scopes execution, never the price. 1 prompt = 1 credit, 30 prompts = 30.
+  Constants in `lib/pricing.ts`; a margin test asserts the credit still covers
+  worst-case 3-platform cost × 1.3 (`MODEL_COST_ESTIMATES` — review quarterly).
 - Manual runs debit upfront (402 gate). Scheduled runs are debited post-hoc by
   `/api/cron/reconcile` (balance may go negative → manual runs blocked).
   Failed runs refunded; revived-after-refund runs re-debited.

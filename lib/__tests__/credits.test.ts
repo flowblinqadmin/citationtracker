@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   MODEL_COST_ESTIMATES,
   CITATION_EXEC_MARGIN,
-  CITATION_EXEC_PRICE_USD,
+  CREDITS_PER_PROMPT,
   CREDIT_USD,
   citationRunCredits,
   debitForRun,
@@ -20,46 +20,26 @@ import { teams, creditTransactions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 describe("citationRunCredits", () => {
-  it("prices a prompt-execution at the most expensive model × margin", () => {
-    const maxCost = Math.max(...Object.values(MODEL_COST_ESTIMATES));
-    expect(CITATION_EXEC_PRICE_USD).toBeCloseTo(maxCost * CITATION_EXEC_MARGIN, 10);
-  });
-
-  it("charges 30 prompts × 3 platforms at the flat rate, ceiled", () => {
-    // 30 × 3 × $0.013 = $1.17 → 12 credits at $0.10/credit
-    expect(citationRunCredits(30)).toBe(12);
-  });
-
-  it("floors at 1 credit", () => {
+  it("charges 1 credit per prompt, flat", () => {
     expect(citationRunCredits(1)).toBe(1);
+    expect(citationRunCredits(2)).toBe(2);
+    expect(citationRunCredits(30)).toBe(30);
   });
 
-  it("ceils fractional credits (never rounds down)", () => {
-    for (const n of [1, 3, 7, 13, 30]) {
-      const exact = (n * 3 * CITATION_EXEC_PRICE_USD) / CREDIT_USD;
-      expect(citationRunCredits(n)).toBeGreaterThanOrEqual(exact);
-    }
+  it("platform selection scopes execution but never changes the price", () => {
+    expect(citationRunCredits(1, 1)).toBe(1);
+    expect(citationRunCredits(30, 1)).toBe(citationRunCredits(30, 3));
   });
 
-  it("guarantees price ≥ cost × 1.3 for every model", () => {
-    for (const cost of Object.values(MODEL_COST_ESTIMATES)) {
-      expect(CITATION_EXEC_PRICE_USD).toBeGreaterThanOrEqual(cost * 1.3 - 1e-12);
-    }
+  it("keeps the per-prompt price ≥ worst-case cost × margin", () => {
+    const worstCaseUsd =
+      Object.values(MODEL_COST_ESTIMATES).reduce((a, b) => a + b, 0) * CITATION_EXEC_MARGIN;
+    expect(CREDITS_PER_PROMPT * CREDIT_USD).toBeGreaterThanOrEqual(worstCaseUsd);
   });
 
   it("rejects non-positive prompt counts", () => {
     expect(() => citationRunCredits(0)).toThrow();
     expect(() => citationRunCredits(-1)).toThrow();
-  });
-
-  it("scales with the selected platform count (single-model runs cost less)", () => {
-    // 30 × 1 × $0.013 = $0.39 → 4 credits; full 3-platform price unchanged
-    expect(citationRunCredits(30, 1)).toBe(4);
-    expect(citationRunCredits(30, 3)).toBe(citationRunCredits(30));
-  });
-
-  it("single prompt on a single model = 1 credit", () => {
-    expect(citationRunCredits(1, 1)).toBe(1);
   });
 
   it("rejects platform counts outside 1–3", () => {

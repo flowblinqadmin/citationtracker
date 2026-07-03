@@ -49,7 +49,7 @@ describe.skipIf(!dbUrl)("POST /api/brands/[id]/run (Postgres)", () => {
 
     const brand = await tdb.createBrand(TEAM, "Run Test", { name: "Acme" });
     clientId = brand.id;
-    // 10 prompts → ceil(10 × 3 × 0.013 / 0.10) = 4 credits
+    // 10 prompts → 10 credits (1 credit per prompt, flat)
     for (let i = 0; i < 10; i++) {
       await tdb.createPrompt(TEAM, clientId, { name: `P${i}`, category: "brand", text: `prompt ${i}` });
     }
@@ -68,8 +68,8 @@ describe.skipIf(!dbUrl)("POST /api/brands/[id]/run (Postgres)", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.started).toBe(true);
-    expect(body.credits).toBe(4);
-    expect(await balance()).toBe(16);
+    expect(body.credits).toBe(10);
+    expect(await balance()).toBe(10);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
@@ -85,7 +85,7 @@ describe.skipIf(!dbUrl)("POST /api/brands/[id]/run (Postgres)", () => {
     const res = await call();
     expect(res.status).toBe(402);
     const body = await res.json();
-    expect(body).toMatchObject({ error: "insufficient_credits", required: 4, balance: 2 });
+    expect(body).toMatchObject({ error: "insufficient_credits", required: 10, balance: 2 });
     expect(body.buyCreditsUrl).toContain("/dashboard");
     expect(await balance()).toBe(2);
     const runs = await tdb.listRuns(TEAM, clientId);
@@ -109,14 +109,14 @@ describe.skipIf(!dbUrl)("POST /api/brands/[id]/run (Postgres)", () => {
     const second = await call();
     expect(second.status).toBe(200);
     expect((await second.json()).alreadyRunning).toBe(true);
-    expect(await balance()).toBe(16); // charged once
+    expect(await balance()).toBe(10); // charged once
   });
 
   it("double-submit race: concurrent POSTs yield exactly one charge and one run", async () => {
     const [a, b] = await Promise.all([call(), call()]);
     const statuses = [a.status, b.status].sort();
     expect(statuses[0]).toBeLessThanOrEqual(201);
-    expect(await balance()).toBe(16);
+    expect(await balance()).toBe(10);
     const runs = await tdb.listRuns(TEAM, clientId);
     expect(runs.filter((r) => r.status === "pending")).toHaveLength(1);
   });

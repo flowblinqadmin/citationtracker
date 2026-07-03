@@ -1,13 +1,15 @@
 // Pure pricing — NO server imports (client components use this for cost
 // previews; lib/credits.ts uses it for actual billing).
 //
-// Flat USD price per prompt-execution pegged to the MOST EXPENSIVE model ×
-// margin, charged for all 3 platforms geo's worker queries — every run is
-// profitable regardless of which model answers best.
+// Pricing is flat and per prompt: 1 credit per prompt per run, regardless of
+// which platforms the run queries. Simple to predict, and comfortably above
+// cost: the worst case (all 3 platforms) is ~$0.039 per prompt vs the $0.10
+// a credit sells for.
 
 // Estimated USD cost of one prompt-execution (1 prompt × 1 model, ~1k tokens
 // out). Perplexity dominates via per-search fees. Review quarterly against
-// provider pricing (see CLAUDE.md).
+// provider pricing (see CLAUDE.md) — the margin test fails if CREDITS_PER_PROMPT
+// stops covering cost × margin.
 export const MODEL_COST_ESTIMATES = {
   openai: 0.002,     // gpt-5.4-mini
   perplexity: 0.010, // sonar (incl. search fee)
@@ -18,14 +20,13 @@ export const CITATION_EXEC_MARGIN = 1.3;
 export const CREDIT_USD = 0.1; // geo: $10 per 100-credit pack
 const ALL_PLATFORM_COUNT = 3;
 
-export const CITATION_EXEC_PRICE_USD =
-  Math.max(...Object.values(MODEL_COST_ESTIMATES)) * CITATION_EXEC_MARGIN;
+/** Flat price: 1 credit per prompt per run (platform choice doesn't change it). */
+export const CREDITS_PER_PROMPT = 1;
 
 /**
- * Credits charged for one run of `numPrompts` prompts on `platformCount`
- * platforms (default: all 3). Per prompt-execution the price is flat
- * (priciest model × margin), so a single prompt on a single model is the
- * smallest billable unit — 1 credit.
+ * Credits charged for one run of `numPrompts` prompts. `platformCount` is the
+ * selected platform subset (1–3) — validated because it scopes execution, but
+ * it does not change the price.
  */
 export function citationRunCredits(numPrompts: number, platformCount = ALL_PLATFORM_COUNT): number {
   if (!Number.isInteger(numPrompts) || numPrompts <= 0) {
@@ -34,6 +35,5 @@ export function citationRunCredits(numPrompts: number, platformCount = ALL_PLATF
   if (!Number.isInteger(platformCount) || platformCount < 1 || platformCount > ALL_PLATFORM_COUNT) {
     throw new Error(`citationRunCredits: platformCount must be 1–${ALL_PLATFORM_COUNT}, got ${platformCount}`);
   }
-  const usd = numPrompts * platformCount * CITATION_EXEC_PRICE_USD;
-  return Math.max(1, Math.ceil(usd / CREDIT_USD));
+  return numPrompts * CREDITS_PER_PROMPT;
 }
