@@ -146,6 +146,19 @@ CREATE TABLE IF NOT EXISTS tracker.responses (
   created_at timestamp DEFAULT now()
 );
 
+-- Owned by the citation service (see lib/db/migrations/20260703-citation-checks.sql)
+CREATE TABLE IF NOT EXISTS citation_checks (
+  citation_id   text PRIMARY KEY,
+  run_id        text NOT NULL,
+  client_id     text NOT NULL,
+  url           text NOT NULL,
+  status        text NOT NULL,
+  http_status   integer,
+  brand_matched boolean,
+  checked_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS citation_checks_run_id_idx ON citation_checks (run_id);
+
 CREATE TABLE IF NOT EXISTS tracker.citations (
   id text PRIMARY KEY,
   response_id text REFERENCES tracker.responses(id) ON DELETE SET NULL,

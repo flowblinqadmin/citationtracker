@@ -69,6 +69,24 @@ export const creditTransactions = pgTable("credit_transactions", {
 });
 
 
+// ── public.citation_checks — citation verification verdicts ─────────────────
+// OWNED by this service (its second migration) — not a geo mirror. One row per
+// tracker citation we fetched and classified against AI hallucination:
+// 'verified' | 'no_mention' | 'dead' | 'unverifiable'. No FK to
+// tracker.citations (geo may purge those); verdicts keep history.
+export type CitationCheckStatus = "verified" | "no_mention" | "dead" | "unverifiable";
+
+export const citationChecks = pgTable("citation_checks", {
+  citationId: text("citation_id").primaryKey(),
+  runId: text("run_id").notNull(),
+  clientId: text("client_id").notNull(),
+  url: text("url").notNull(),
+  status: text("status").$type<CitationCheckStatus>().notNull(),
+  httpStatus: integer("http_status"),
+  brandMatched: boolean("brand_matched"),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── public.rate_limits — DB-backed rate limiter (shared with geo) ───────────
 export const rateLimits = pgTable("rate_limits", {
   key: text("key").primaryKey(),

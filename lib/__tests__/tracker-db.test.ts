@@ -381,6 +381,7 @@ describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
         domain: "acme.com",
         count: 1,
         brand: true,
+        check: null,
       });
       expect(top).toHaveLength(4); // cit_5's vertexaisearch host is filtered out
       expect(top.find((d) => d.domain === "docs.acme.com")?.brand).toBe(true);
@@ -391,6 +392,67 @@ describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
     it("cross-org: stats and domains are empty for a foreign team", async () => {
       expect(await tdb.listRunsWithStats("tm_other_team", clientId)).toEqual([]);
       expect(await tdb.getRunTopSources("tm_other_team", clientId, runId)).toEqual([]);
+    });
+  });
+
+  describe("citation verification (hallucination guard)", () => {
+    beforeEach(async () => {
+      await db.delete(schema.citationChecks);
+      const [version] = await db
+        .select()
+        .from(schema.trackerPromptVersions)
+        .where(eq(schema.trackerPromptVersions.promptId, promptId));
+      const cite = (suffix: string, domain: string, resolved?: string) =>
+        db.insert(schema.trackerCitations).values({
+          id: `${runId}_${suffix}`, runId, clientId, promptVersionId: version.id, platform: "openai",
+          rawUrl: `https://${domain}/x`, resolvedUrl: resolved ?? null,
+          normalizedUrl: `${domain}/x`, domain, matchType: "unmatched",
+        });
+      await cite("v1", "g2.com", "https://g2.com/products/other-flow");
+      await cite("v2", "acme.com");
+      // Foreign (PCG-like, non-team) org citation — must never enter the sweep.
+      await db.execute(sql`INSERT INTO tracker.orgs (id, name) VALUES ('org_pcg_verify', 'PCG') ON CONFLICT DO NOTHING`);
+      await db.execute(sql`INSERT INTO tracker.clients (id, org_id, name) VALUES ('tc_pcg_verify', 'org_pcg_verify', 'PCG Brand')`);
+      await db.execute(sql`INSERT INTO tracker.runs (id, client_id, org_id, period, kind, status)
+        VALUES (${'tr_pcg_' + runId}, 'tc_pcg_verify', 'org_pcg_verify', '2026-07', 'manual', 'complete')`);
+      await db.execute(sql`INSERT INTO tracker.citations (id, run_id, client_id, raw_url, normalized_url, domain, match_type)
+        VALUES (${'cit_pcg_' + runId}, ${'tr_pcg_' + runId}, 'tc_pcg_verify', 'https://pcg.com/x', 'pcg.com/x', 'pcg.com', 'unmatched')`);
+    });
+
+    it("sweep lists only unchecked TEAM citations, resolved-URL first, with brand keywords", async () => {
+      const unchecked = await tdb.listUncheckedTeamCitations(50);
+      const ids = unchecked.map((u) => u.citationId);
+      expect(ids).toContain(`${runId}_v1`);
+      expect(ids).toContain(`${runId}_v2`);
+      expect(ids).not.toContain(`cit_pcg_${runId}`);
+      const v1 = unchecked.find((u) => u.citationId === `${runId}_v1`)!;
+      expect(v1.url).toBe("https://g2.com/products/other-flow"); // resolved wins
+      expect(v1.keywords).toContain("Acme");
+    });
+
+    it("recorded verdicts leave the sweep and are exactly-once", async () => {
+      await tdb.recordCitationChecks([
+        { citationId: `${runId}_v1`, runId, clientId, url: "https://g2.com/products/other-flow", status: "no_mention", httpStatus: 200, brandMatched: false },
+      ]);
+      // duplicate record is a no-op, not an error
+      await tdb.recordCitationChecks([
+        { citationId: `${runId}_v1`, runId, clientId, url: "https://g2.com/products/other-flow", status: "verified" },
+      ]);
+      const ids = (await tdb.listUncheckedTeamCitations(50)).map((u) => u.citationId);
+      expect(ids).not.toContain(`${runId}_v1`);
+      expect(ids).toContain(`${runId}_v2`);
+      const checks = await tdb.listRunCitationChecks(TEAM, clientId, runId);
+      expect(checks["https://g2.com/products/other-flow"]).toBe("no_mention"); // first verdict kept
+    });
+
+    it("top sources carry the verdict; url→verdict map is org-scoped", async () => {
+      await tdb.recordCitationChecks([
+        { citationId: `${runId}_v1`, runId, clientId, url: "https://g2.com/products/other-flow", status: "no_mention", brandMatched: false },
+      ]);
+      const top = await tdb.getRunTopSources(TEAM, clientId, runId);
+      expect(top.find((t) => t.domain === "g2.com")?.check).toBe("no_mention");
+      expect(top.find((t) => t.domain === "acme.com")?.check).toBeNull(); // pending
+      expect(await tdb.listRunCitationChecks("tm_other_team", clientId, runId)).toEqual({});
     });
   });
 });

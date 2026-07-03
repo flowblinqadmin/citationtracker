@@ -3,6 +3,10 @@
     {
       "path": "/citations/api/cron/reconcile",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/citations/api/cron/verify-citations",
+      "schedule": "15 * * * *"
     }
   ]
 }

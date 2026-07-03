@@ -54,6 +54,22 @@ interface TopSource {
   domain: string;
   count: number;
   brand: boolean;
+  check: CheckStatus | null; // verification verdict; null = pending
+}
+
+type CheckStatus = "verified" | "no_mention" | "dead" | "unverifiable";
+
+/** Hallucination-guard badge: every cited page is fetched and classified. */
+function CheckBadge({ check }: { check: CheckStatus | null | undefined }) {
+  if (check === "verified") return <span title="Page is live and mentions the brand" style={{ color: GREEN }}>✓</span>;
+  if (check === "no_mention")
+    return (
+      <span title="Page is live but never mentions the brand — likely a hallucinated citation" style={{ color: "#d97706", fontWeight: 600 }}>
+        ⚠ no brand mention
+      </span>
+    );
+  if (check === "dead") return <span title="Link is dead (4xx/5xx)" style={{ color: RED }}>✗ dead</span>;
+  return null; // pending / unverifiable — no claim either way
 }
 
 const CARD = "#ffffff";
@@ -239,16 +255,18 @@ const hostOf = (url: string) => {
   }
 };
 
-/** Cited sources as links — URLs arrive redirect-resolved from the API. */
-function SourceLinks({ urls }: { urls?: string[] }) {
+/** Cited sources as links — URLs arrive redirect-resolved; dead links are dropped. */
+function SourceLinks({ urls, checks }: { urls?: string[]; checks?: Record<string, CheckStatus> }) {
   if (!urls?.length) return null;
   const seen = new Set<string>();
   const sources = urls.flatMap((u) => {
     const host = hostOf(u);
-    if (!host || seen.has(host)) return [];
+    const check = checks?.[u] ?? null;
+    if (!host || seen.has(host) || check === "dead") return [];
     seen.add(host);
-    return [{ host, url: u }];
+    return [{ host, url: u, check }];
   });
+  if (!sources.length) return null;
   return (
     <span style={{ color: MUTED }}>
       Sources:{" "}
@@ -258,13 +276,15 @@ function SourceLinks({ urls }: { urls?: string[] }) {
           <a href={s.url} target="_blank" rel="noopener noreferrer" style={{ color: ACCENT }}>
             {s.host}
           </a>
+          {s.check === "verified" && <span title="Page mentions the brand" style={{ color: GREEN }}>✓</span>}
+          {s.check === "no_mention" && <span title="Page never mentions the brand — likely hallucinated" style={{ color: "#d97706" }}>⚠</span>}
         </span>
       ))}
     </span>
   );
 }
 
-function ReplyText({ text, mentioned, sentiment, citedUrls }: { text: string | null; mentioned: boolean; sentiment?: string | null; citedUrls?: string[] }) {
+function ReplyText({ text, mentioned, sentiment, citedUrls, checks }: { text: string | null; mentioned: boolean; sentiment?: string | null; citedUrls?: string[]; checks?: Record<string, CheckStatus> }) {
   const [expanded, setExpanded] = useState(false);
   const long = (text?.length ?? 0) > REPLY_PREVIEW_CHARS;
   const shown = !text ? null : expanded || !long ? text : previewSlice(text);
@@ -278,7 +298,7 @@ function ReplyText({ text, mentioned, sentiment, citedUrls }: { text: string | n
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginTop: 6, fontSize: 11 }}>
         {mentioned && <span style={{ color: GREEN, fontWeight: 600 }}>✓ brand mentioned</span>}
         <SentimentChip sentiment={sentiment ?? null} />
-        <SourceLinks urls={citedUrls} />
+        <SourceLinks urls={citedUrls} checks={checks} />
         {long && (
           <button
             onClick={() => setExpanded((v) => !v)}
@@ -310,6 +330,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
   const [historyPromptId, setHistoryPromptId] = useState<string | null>(null);
   const [history, setHistory] = useState<Record<string, HistoryRow[]>>({});
   const [topSources, setTopSources] = useState<Record<string, TopSource[]>>({});
+  const [sourceChecks, setSourceChecks] = useState<Record<string, Record<string, CheckStatus>>>({});
 
   const load = useCallback(async () => {
     const [brandRes, promptsRes, runsRes, teamRes] = await Promise.all([
@@ -419,6 +440,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
         const body = await res.json();
         setReplies((m) => ({ ...m, [latestCompleteId]: body.responses }));
         setTopSources((m) => ({ ...m, [latestCompleteId]: body.topSources ?? [] }));
+        setSourceChecks((m) => ({ ...m, [latestCompleteId]: body.sourceChecks ?? {} }));
       }
     });
   }, [tab, latestCompleteId, clientId, replies]);
@@ -435,6 +457,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
         const body = await res.json();
         setReplies((m) => ({ ...m, [runId]: body.responses }));
         setTopSources((m) => ({ ...m, [runId]: body.topSources ?? [] }));
+        setSourceChecks((m) => ({ ...m, [runId]: body.sourceChecks ?? {} }));
       }
     }
   }
@@ -622,17 +645,20 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                     <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
                       <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Top cited pages (latest run)</div>
                       <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
-                        {latestSources.map((sSrc) => (
+                        {latestSources.filter((sSrc) => sSrc.check !== "dead").map((sSrc) => (
                           <div key={sSrc.page} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                            <a
-                              href={sSrc.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title={sSrc.url}
-                              style={{ fontWeight: sSrc.brand ? 700 : 400, color: sSrc.brand ? GREEN : ACCENT, overflowWrap: "anywhere" }}
-                            >
-                              {sSrc.page.length > 70 ? `${sSrc.page.slice(0, 70)}…` : sSrc.page}{sSrc.brand ? " · you" : ""}
-                            </a>
+                            <span style={{ overflowWrap: "anywhere" }}>
+                              <a
+                                href={sSrc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={sSrc.url}
+                                style={{ fontWeight: sSrc.brand ? 700 : 400, color: sSrc.brand ? GREEN : ACCENT }}
+                              >
+                                {sSrc.page.length > 70 ? `${sSrc.page.slice(0, 70)}…` : sSrc.page}{sSrc.brand ? " · you" : ""}
+                              </a>
+                              {" "}<CheckBadge check={sSrc.check} />
+                            </span>
                             <span style={{ color: MUTED, whiteSpace: "nowrap" }}>{sSrc.count}×</span>
                           </div>
                         ))}
@@ -852,7 +878,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                         {resp.model ? ` · ${resp.model}` : ""}
                         {resp.attempt > 1 ? ` · attempt ${resp.attempt}` : ""}
                       </div>
-                      <ReplyText text={resp.responseText} mentioned={resp.brandMentioned} sentiment={resp.sentiment} citedUrls={resp.citedUrls} />
+                      <ReplyText text={resp.responseText} mentioned={resp.brandMentioned} sentiment={resp.sentiment} citedUrls={resp.citedUrls} checks={sourceChecks[r.id]} />
                     </div>
                   ))}
                 </div>

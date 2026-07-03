@@ -13,8 +13,10 @@ import {
   trackerRuns,
   trackerResponses,
   trackerCitations,
+  citationChecks,
   type TrackerClient,
   type TrackerRun,
+  type CitationCheckStatus,
 } from "@/lib/db/schema";
 import type {
   TrackerCompetitor,
@@ -23,7 +25,7 @@ import type {
   TrackerRunFrequency,
   TrackerRunScope,
 } from "@/lib/types/tracker";
-import { and, asc, desc, eq, gte, inArray, like, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, like, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
 const MAX_ACTIVE_PROMPTS = 30;
@@ -348,6 +350,26 @@ export interface TopSource {
   domain: string;
   count: number;
   brand: boolean;
+  /** Verification verdict (hallucination guard); null = not yet checked. */
+  check: CitationCheckStatus | null;
+}
+
+const CHECK_RANK: Record<CitationCheckStatus, number> = {
+  dead: 0,
+  no_mention: 1,
+  unverifiable: 2,
+  verified: 3,
+};
+
+/** Pessimistic reduce of a page's citation verdicts (dead wins over verified). */
+function worstCheck(statuses: Array<string | null> | null): CitationCheckStatus | null {
+  let worst: CitationCheckStatus | null = null;
+  for (const s of statuses ?? []) {
+    if (!s || !(s in CHECK_RANK)) continue;
+    const status = s as CitationCheckStatus;
+    if (worst === null || CHECK_RANK[status] < CHECK_RANK[worst]) worst = status;
+  }
+  return worst;
 }
 
 // Gemini grounding returns vertexaisearch redirect URLs; geo resolves them
@@ -369,20 +391,119 @@ export async function getRunTopSources(
     .select({
       page: trackerCitations.normalizedUrl,
       domain: trackerCitations.domain,
-      count: sql<number>`count(*)::int`,
+      count: sql<number>`count(distinct ${trackerCitations.id})::int`,
       url: sql<string>`min(coalesce(${trackerCitations.resolvedUrl}, ${trackerCitations.rawUrl}))`,
+      checks: sql<Array<string | null> | null>`array_agg(distinct ${citationChecks.status}) filter (where ${citationChecks.status} is not null)`,
     })
     .from(trackerCitations)
+    .leftJoin(citationChecks, eq(citationChecks.citationId, trackerCitations.id))
     .where(and(eq(trackerCitations.runId, runId), eq(trackerCitations.clientId, clientId)))
     .groupBy(trackerCitations.normalizedUrl, trackerCitations.domain)
-    .orderBy(sql`count(*) desc`, asc(trackerCitations.normalizedUrl))
+    .orderBy(sql`count(distinct ${trackerCitations.id}) desc`, asc(trackerCitations.normalizedUrl))
     .limit(limit);
   return rows
     .filter((r) => r.domain !== "" && !REDIRECT_HOSTS.includes(r.domain))
-    .map((r) => ({
+    .map(({ checks, ...r }) => ({
       ...r,
       brand: !!brandDomain && (r.domain === brandDomain || r.domain.endsWith(`.${brandDomain}`)),
+      check: worstCheck(checks),
     }));
+}
+
+// ── Citation verification (hallucination guard) ─────────────────────────────
+
+export interface UncheckedCitation {
+  citationId: string;
+  runId: string;
+  clientId: string;
+  url: string;
+  /** Brand keywords the cited page must mention: stored keywords + name + domain stem. */
+  keywords: string[];
+}
+
+/**
+ * Team-org citations (last 90 days) with no verification verdict yet — the
+ * hourly sweep's worklist. Never returns PCG citations.
+ */
+export async function listUncheckedTeamCitations(limit: number): Promise<UncheckedCitation[]> {
+  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  const rows = await db
+    .select({
+      citationId: trackerCitations.id,
+      runId: trackerCitations.runId,
+      clientId: trackerCitations.clientId,
+      url: sql<string>`coalesce(${trackerCitations.resolvedUrl}, ${trackerCitations.rawUrl})`,
+      name: trackerClients.name,
+      domain: trackerClients.domain,
+      brandKeywords: trackerClients.brandKeywords,
+    })
+    .from(trackerCitations)
+    .innerJoin(trackerClients, eq(trackerCitations.clientId, trackerClients.id))
+    .leftJoin(citationChecks, eq(citationChecks.citationId, trackerCitations.id))
+    .where(
+      and(
+        like(trackerClients.orgId, "team\\_%"),
+        isNull(citationChecks.citationId),
+        gte(trackerCitations.createdAt, cutoff),
+      ),
+    )
+    .orderBy(desc(trackerCitations.createdAt))
+    .limit(limit);
+  return rows.map((r) => {
+    const stem = r.domain?.replace(/^www\./, "").split(".")[0];
+    const keywords = [...new Set([...(r.brandKeywords?.keywords ?? []), r.name, stem].filter((k): k is string => !!k))];
+    return { citationId: r.citationId, runId: r.runId, clientId: r.clientId, url: r.url, keywords };
+  });
+}
+
+export interface CitationCheckInput {
+  citationId: string;
+  runId: string;
+  clientId: string;
+  url: string;
+  status: CitationCheckStatus;
+  httpStatus?: number;
+  brandMatched?: boolean;
+}
+
+/** Record verdicts — first verdict wins (idempotent re-sweeps). */
+export async function recordCitationChecks(checks: CitationCheckInput[]): Promise<void> {
+  if (checks.length === 0) return;
+  await db
+    .insert(citationChecks)
+    .values(
+      checks.map((c) => ({
+        citationId: c.citationId,
+        runId: c.runId,
+        clientId: c.clientId,
+        url: c.url,
+        status: c.status,
+        httpStatus: c.httpStatus ?? null,
+        brandMatched: c.brandMatched ?? null,
+      })),
+    )
+    .onConflictDoNothing({ target: citationChecks.citationId });
+}
+
+/** url → verdict for a run's citations (keys match the served citedUrls). */
+export async function listRunCitationChecks(
+  teamId: string,
+  clientId: string,
+  runId: string,
+): Promise<Record<string, CitationCheckStatus>> {
+  const brand = await getBrand(teamId, clientId);
+  if (!brand) return {};
+  const rows = await db
+    .select({ url: citationChecks.url, status: citationChecks.status })
+    .from(citationChecks)
+    .where(and(eq(citationChecks.runId, runId), eq(citationChecks.clientId, clientId)));
+  const map: Record<string, CitationCheckStatus> = {};
+  for (const r of rows) {
+    // Pessimistic on conflicts between duplicate URLs: dead wins, then no_mention.
+    const prev = map[r.url];
+    if (!prev || CHECK_RANK[r.status] < CHECK_RANK[prev]) map[r.url] = r.status;
+  }
+  return map;
 }
 
 export type ManualRunResult =
