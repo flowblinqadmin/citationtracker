@@ -4,6 +4,7 @@
 // history with stored metrics, and the credit-gated "Run now".
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import ReactMarkdown, { type Components } from "react-markdown";
 import { toast } from "sonner";
 import { apiUrl } from "@/lib/api-url";
 import { GEO_ORIGIN } from "@/lib/config";
@@ -75,16 +76,39 @@ const PLATFORM_ORDER = ["openai", "perplexity", "google"];
 
 const REPLY_PREVIEW_CHARS = 280;
 
-// Collapsed preview + expand-in-place. Deliberately NO inner scrollbars —
-// a fixed-height scrollable box traps the wheel and hides the platforms
-// below it, which reads as "the other replies are missing".
+// AI replies are markdown — render it (react-markdown builds React elements;
+// no raw HTML, so LLM output can't inject markup). Collapsed preview +
+// expand-in-place, deliberately NO inner scrollbars — a fixed-height
+// scrollable box traps the wheel and hides the platforms below it.
+const MD_COMPONENTS: Components = {
+  p: (props) => <p style={{ margin: "0 0 8px" }} {...props} />,
+  ul: (props) => <ul style={{ margin: "0 0 8px", paddingLeft: 20 }} {...props} />,
+  ol: (props) => <ol style={{ margin: "0 0 8px", paddingLeft: 20 }} {...props} />,
+  li: (props) => <li style={{ marginBottom: 2 }} {...props} />,
+  h1: (props) => <strong style={{ display: "block", margin: "8px 0 4px" }} {...props} />,
+  h2: (props) => <strong style={{ display: "block", margin: "8px 0 4px" }} {...props} />,
+  h3: (props) => <strong style={{ display: "block", margin: "8px 0 4px" }} {...props} />,
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: ACCENT }}>
+      {children}
+    </a>
+  ),
+  code: (props) => (
+    <code style={{ background: "#f5f5f4", borderRadius: 4, padding: "1px 4px", fontSize: 12 }} {...props} />
+  ),
+};
+
 function ReplyText({ text, mentioned }: { text: string | null; mentioned: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const long = (text?.length ?? 0) > REPLY_PREVIEW_CHARS;
   const shown = !text ? null : expanded || !long ? text : `${text.slice(0, REPLY_PREVIEW_CHARS).trimEnd()}…`;
   return (
-    <div style={{ whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.5, background: "#fafaf9", border: BORDER, borderRadius: 8, padding: "10px 12px" }}>
-      {shown ?? <em style={{ color: MUTED }}>no response captured</em>}
+    <div style={{ fontSize: 13, lineHeight: 1.5, background: "#fafaf9", border: BORDER, borderRadius: 8, padding: "10px 12px" }}>
+      {shown === null ? (
+        <em style={{ color: MUTED }}>no response captured</em>
+      ) : (
+        <ReactMarkdown components={MD_COMPONENTS}>{shown}</ReactMarkdown>
+      )}
       <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11 }}>
         {mentioned && <span style={{ color: GREEN, fontWeight: 600 }}>✓ brand mentioned</span>}
         {long && (
