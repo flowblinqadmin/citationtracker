@@ -85,6 +85,18 @@ https://geo.flowblinq.com) and its database. Verified against prod 2026-07-03.
   BB-03 uses site_id for Stripe session ids). Enforced by a partial unique
   index (the ONE migration this repo ships).
 
+## Citation verification (hallucination guard)
+
+Every team-org citation gets a permanent verdict in `citation_checks` (owned
+by THIS service): `verified` (live + brand mentioned) / `no_mention` (live,
+brand absent — hallucinated relevance) / `dead` / `unverifiable`. Hourly cron
+`/api/cron/verify-citations`: SSRF-guarded direct fetch (visible-text keyword
+match, tags/hrefs stripped; bot-block statuses 401/403/407/429/451 are NOT
+dead) → unsettled verdicts escalate to a Firecrawl scrape (renders JS, passes
+bot walls; markdown matched with link targets stripped). `FIRECRAWL_API_KEY`
+in Vercel env (from geo's account). UI: dead links dropped, `no_mention`
+badged, per-model attribution on top cited pages.
+
 ## Auth
 
 Login lives on geo. Same origin (path routing) → the shared Supabase session
