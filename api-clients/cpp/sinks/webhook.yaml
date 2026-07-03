@@ -1,0 +1,30 @@
+# Generic HMAC-signed JSON webhook sink (TS-088 §4.4).
+name: webhook
+secrets:
+  signing_secret: { env: WEBHOOK_SIGNING_SECRET }
+
+request:
+  method: POST
+  url: "{{ env.WEBHOOK_URL }}"
+  headers:
+    Content-Type: application/json
+    X-Flowblinq-Signature: "{{ hmac_sha256(body_json, signing_secret) }}"
+  body_json:
+    id: "{{ row.id }}"
+    domain: "{{ env.FLOWBLINQ_DOMAIN }}"
+    event: page_view
+    url: "{{ row.page_url }}"
+    referrer: "{{ row.referrer }}"
+    visitor_id: "{{ row.visitor_id }}"
+    bot_name: "{{ row.bot_name }}"
+    ts: "{{ row.viewed_at }}"
+
+constraints:
+  max_body_bytes: 131072
+  retriable_status_codes: [408, 429, 500, 502, 503, 504]
+  non_retriable_status_codes: [400, 401, 403, 404, 422]
+  retry_policy:
+    max_attempts: 5
+    initial_backoff_ms: 500
+    max_backoff_ms: 30000
+    jitter: true

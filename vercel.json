@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/process-queue",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/pipeline-health",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/recrawl",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

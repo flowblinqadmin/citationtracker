@@ -1,0 +1,10 @@
+services:
+  geo:
+    build: .
+    image: geo-app
+    ports:
+      - "3030:3000"
+    env_file:
+      - .env.local
+    environment:
+      - NODE_ENV=production

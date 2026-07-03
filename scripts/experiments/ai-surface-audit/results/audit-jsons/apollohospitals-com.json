@@ -1,0 +1,42 @@
+{
+  "domain": "apollohospitals.com",
+  "score": 0,
+  "max_score": 100,
+  "pages_audited": 20,
+  "audit_date": "2026-04-12",
+  "issues": [
+    {
+      "name": "No machine-readable business identity",
+      "severity": "high",
+      "time_estimate": "30 min",
+      "description": "AI tools cannot identify what this business does, where it operates, or what services it offers."
+    },
+    {
+      "name": "No review or rating signals for AI",
+      "severity": "high",
+      "time_estimate": "1 hour",
+      "description": "AI shopping agents cannot cite customer reviews or ratings when recommending this business."
+    },
+    {
+      "name": "No FAQ content formatted for AI",
+      "severity": "medium",
+      "time_estimate": "2 hours",
+      "description": "Missing FAQ content means AI cannot answer common questions about the business directly."
+    },
+    {
+      "name": "No AI context file (llms.txt)",
+      "severity": "medium",
+      "time_estimate": "15 min",
+      "description": "No llms.txt file to guide AI crawlers on what the business does and what pages matter."
+    },
+    {
+      "name": "No shipping or return policy visible to AI",
+      "severity": "low",
+      "time_estimate": "30 min",
+      "description": "AI shopping agents look for commerce trust signals like shipping and return information."
+    }
+  ],
+  "projected_score_after_fixes": "40+",
+  "ai_surface_visibility": {},
+  "competitor_visibility": []
+}

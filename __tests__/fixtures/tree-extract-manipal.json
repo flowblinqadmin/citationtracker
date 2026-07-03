@@ -1,0 +1,328 @@
+{
+  "__rm_synthetic": true,
+  "__rm_note": "ES-086 Phase A synthetic fixture authored by ReviewMaster (Agent 9). Mirrors the structure of the 243-page Manipal production capture referenced in TS-086 §2.1 + AC-7 but contains ZERO real customer PII. The real extraction from prod produced geoTree.leafCount=1 (India-only), categoryTree.leafCount=100 (healthcare specialties). This synthetic captures a representative ~40-page slice with the same shape so extractTrees tests can exercise the happy path. ScriptDev replaces this with a redacted production extract during ES-086 implementation; when they do, U49/U50 assertions should continue to hold because they only check leafCount > 0 and root.children.length > 0 (not exact counts).",
+  "__rm_id_warning": "Do NOT use the literal site ID '-GzFX1KcKhmN0W_1t8SmY' in this fixture or any test that references it. The ReviewMaster Phase A discipline is to use 'manipal-fixture-rm' so tests stay decoupled from ScriptDev source identifiers. The real fixture will use 'manipal-ts083-79f1775171a9' per TS-086 §2.1; that's ScriptDev's identifier, not mine.",
+  "__rm_shared_with_ts085": "This fixture is SHARED with TS-085 AC-1. ScriptDev creates the real version during ES-086 implementation; ES-085 consumes it. The synthetic here is a placeholder to let RM Phase A tests load and run against a realistic structure before the real capture lands.",
+
+  "siteId": "manipal-fixture-rm",
+  "domain": "manipal-fixture-rm.com",
+
+  "crawlData": {
+    "domain": "manipal-fixture-rm.com",
+    "totalCrawled": 243,
+    "pages": [
+      {
+        "url": "https://manipal-fixture-rm.com/",
+        "pageType": "homepage",
+        "title": "Manipal Fixture Hospitals — Multi-Specialty Healthcare Network",
+        "h1": "Manipal Fixture Hospitals",
+        "headings": [
+          { "level": 1, "text": "Manipal Fixture Hospitals" },
+          { "level": 2, "text": "Comprehensive Healthcare Across India" },
+          { "level": 2, "text": "Our Specialties" }
+        ],
+        "content": "Manipal Fixture Hospitals operates 33 multi-specialty facilities across 17 Indian cities with 9,500+ beds and 5,000+ doctors. Founded 1991 in Bangalore. Quaternary care including cardiology, oncology, neurosciences, organ transplants, robotic surgery.",
+        "existingSchema": ["MedicalOrganization"],
+        "hasStructuredData": true,
+        "contactInfo": ["info@manipal-fixture-rm.com"],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": ["NABH", "JCI"]
+      },
+      {
+        "url": "https://manipal-fixture-rm.com/about-us/",
+        "pageType": "about",
+        "title": "About Manipal Fixture Hospitals",
+        "h1": "About Us",
+        "headings": [{ "level": 1, "text": "About Us" }, { "level": 2, "text": "Our Journey" }],
+        "content": "Founded 1991 in Bangalore, Karnataka, India. Part of the Manipal Education and Medical Group.",
+        "existingSchema": ["AboutPage"],
+        "hasStructuredData": true,
+        "contactInfo": [],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://manipal-fixture-rm.com/specialties/cardiology/",
+        "pageType": "services",
+        "title": "Cardiology — Manipal Fixture Hospitals",
+        "h1": "Cardiology",
+        "headings": [{ "level": 1, "text": "Cardiology" }, { "level": 2, "text": "Interventional Procedures" }],
+        "content": "Angioplasty, CABG, valve replacement, TAVI, electrophysiology across Bangalore, Delhi, Pune facilities.",
+        "existingSchema": ["MedicalSpecialty"],
+        "hasStructuredData": true,
+        "contactInfo": [],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://manipal-fixture-rm.com/specialties/oncology/",
+        "pageType": "services",
+        "title": "Oncology — Manipal Fixture Hospitals",
+        "h1": "Oncology",
+        "headings": [{ "level": 1, "text": "Oncology" }, { "level": 2, "text": "Cancer Care" }],
+        "content": "Medical oncology, surgical oncology, radiation oncology, BMT. Dedicated centres in Bangalore, Mysore, Vijayawada.",
+        "existingSchema": ["MedicalSpecialty"],
+        "hasStructuredData": true,
+        "contactInfo": [],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://manipal-fixture-rm.com/specialties/neurosciences/",
+        "pageType": "services",
+        "title": "Neurosciences — Manipal Fixture Hospitals",
+        "h1": "Neurosciences",
+        "headings": [{ "level": 1, "text": "Neurosciences" }],
+        "content": "Stroke care, epilepsy surgery, DBS, spine surgery, neurorehab across the network.",
+        "existingSchema": ["MedicalSpecialty"],
+        "hasStructuredData": true,
+        "contactInfo": [],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://manipal-fixture-rm.com/specialties/orthopedics/",
+        "pageType": "services",
+        "title": "Orthopedics — Manipal Fixture Hospitals",
+        "h1": "Orthopedics",
+        "headings": [{ "level": 1, "text": "Orthopedics" }],
+        "content": "Joint replacement, sports medicine, spine surgery, paediatric orthopaedics.",
+        "existingSchema": ["MedicalSpecialty"],
+        "hasStructuredData": true,
+        "contactInfo": [],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://manipal-fixture-rm.com/specialties/urology/",
+        "pageType": "services",
+        "title": "Urology — Manipal Fixture Hospitals",
+        "h1": "Urology",
+        "headings": [{ "level": 1, "text": "Urology" }],
+        "content": "Robotic urology, kidney stone management, urologic oncology, renal transplant.",
+        "existingSchema": ["MedicalSpecialty"],
+        "hasStructuredData": true,
+        "contactInfo": [],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://manipal-fixture-rm.com/specialties/gastroenterology/",
+        "pageType": "services",
+        "title": "Gastroenterology — Manipal Fixture Hospitals",
+        "h1": "Gastroenterology",
+        "headings": [{ "level": 1, "text": "Gastroenterology" }],
+        "content": "Liver transplant, IBD, advanced endoscopy, hepato-pancreato-biliary surgery.",
+        "existingSchema": ["MedicalSpecialty"],
+        "hasStructuredData": true,
+        "contactInfo": [],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://manipal-fixture-rm.com/locations/bangalore/",
+        "pageType": "other",
+        "title": "Bangalore Hospitals — Manipal Fixture",
+        "h1": "Bangalore Facilities",
+        "headings": [{ "level": 1, "text": "Bangalore Facilities" }],
+        "content": "Old Airport Road, Whitefield, Jayanagar, Sarjapur Road locations in Bangalore, Karnataka.",
+        "existingSchema": ["Place"],
+        "hasStructuredData": true,
+        "contactInfo": [],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://manipal-fixture-rm.com/locations/delhi/",
+        "pageType": "other",
+        "title": "Delhi Hospitals — Manipal Fixture",
+        "h1": "Delhi Facilities",
+        "headings": [{ "level": 1, "text": "Delhi Facilities" }],
+        "content": "Dwarka and Patparganj flagship hospitals in Delhi NCR.",
+        "existingSchema": ["Place"],
+        "hasStructuredData": true,
+        "contactInfo": [],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://manipal-fixture-rm.com/locations/pune/",
+        "pageType": "other",
+        "title": "Pune Hospitals — Manipal Fixture",
+        "h1": "Pune Facilities",
+        "headings": [{ "level": 1, "text": "Pune Facilities" }],
+        "content": "Baner and Kharadi facilities serving Pune, Maharashtra region.",
+        "existingSchema": ["Place"],
+        "hasStructuredData": true,
+        "contactInfo": [],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://manipal-fixture-rm.com/locations/mysore/",
+        "pageType": "other",
+        "title": "Mysore Hospital — Manipal Fixture",
+        "h1": "Mysore Facility",
+        "headings": [{ "level": 1, "text": "Mysore Facility" }],
+        "content": "Mysore location serving Karnataka region. Accredited oncology and cardiac care.",
+        "existingSchema": ["Place"],
+        "hasStructuredData": true,
+        "contactInfo": [],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://manipal-fixture-rm.com/team/",
+        "pageType": "team",
+        "title": "Leadership and Clinical Team",
+        "h1": "Leadership and Clinical Team",
+        "headings": [{ "level": 1, "text": "Leadership and Clinical Team" }],
+        "content": "Dr A. Kumar heads Cardiac Sciences. Dr P. Raghavan heads Oncology. Dr R. Menon is Chief Medical Officer.",
+        "existingSchema": [],
+        "hasStructuredData": false,
+        "contactInfo": [],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://manipal-fixture-rm.com/contact/",
+        "pageType": "contact",
+        "title": "Contact Us",
+        "h1": "Contact",
+        "headings": [{ "level": 1, "text": "Contact" }],
+        "content": "Email info@manipal-fixture-rm.com for appointments.",
+        "existingSchema": ["ContactPage"],
+        "hasStructuredData": true,
+        "contactInfo": ["info@manipal-fixture-rm.com"],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      }
+    ]
+  },
+
+  "discoveryData": {
+    "urls": [
+      "https://manipal-fixture-rm.com/",
+      "https://manipal-fixture-rm.com/about-us/",
+      "https://manipal-fixture-rm.com/specialties/cardiology/",
+      "https://manipal-fixture-rm.com/specialties/oncology/",
+      "https://manipal-fixture-rm.com/team/",
+      "https://manipal-fixture-rm.com/contact/"
+    ],
+    "pageMap": {
+      "https://manipal-fixture-rm.com/": "homepage",
+      "https://manipal-fixture-rm.com/about-us/": "about",
+      "https://manipal-fixture-rm.com/specialties/cardiology/": "services",
+      "https://manipal-fixture-rm.com/specialties/oncology/": "services",
+      "https://manipal-fixture-rm.com/team/": "team",
+      "https://manipal-fixture-rm.com/contact/": "contact"
+    },
+    "hasLlmsTxt": false,
+    "hasUcp": false,
+    "hasSitemap": true,
+    "hasRobots": true,
+    "totalPages": 243
+  },
+
+  "expectedTreeExtractionResponse": {
+    "geoTree": {
+      "root": {
+        "id": "global",
+        "name": "Global",
+        "level": "global",
+        "children": [
+          {
+            "id": "in",
+            "name": "India",
+            "level": "country",
+            "children": [
+              {
+                "id": "in-ka",
+                "name": "Karnataka",
+                "level": "state",
+                "children": [
+                  { "id": "in-ka-blr", "name": "Bangalore", "level": "city", "children": [], "pageCount": 22, "evidence": ["https://manipal-fixture-rm.com/locations/bangalore/"] },
+                  { "id": "in-ka-mys", "name": "Mysore", "level": "city", "children": [], "pageCount": 5, "evidence": ["https://manipal-fixture-rm.com/locations/mysore/"] }
+                ],
+                "pageCount": 27,
+                "evidence": []
+              },
+              {
+                "id": "in-dl",
+                "name": "Delhi",
+                "level": "state",
+                "children": [
+                  { "id": "in-dl-del", "name": "Delhi", "level": "city", "children": [], "pageCount": 8, "evidence": ["https://manipal-fixture-rm.com/locations/delhi/"] }
+                ],
+                "pageCount": 8,
+                "evidence": []
+              },
+              {
+                "id": "in-mh",
+                "name": "Maharashtra",
+                "level": "state",
+                "children": [
+                  { "id": "in-mh-pune", "name": "Pune", "level": "city", "children": [], "pageCount": 6, "evidence": ["https://manipal-fixture-rm.com/locations/pune/"] }
+                ],
+                "pageCount": 6,
+                "evidence": []
+              }
+            ],
+            "pageCount": 41,
+            "evidence": []
+          }
+        ],
+        "pageCount": 41,
+        "evidence": []
+      },
+      "leafCount": 4,
+      "extractedAt": "2026-04-09T10:00:00.000Z"
+    },
+    "categoryTree": {
+      "root": {
+        "id": "healthcare",
+        "name": "Healthcare",
+        "level": 0,
+        "children": [
+          { "id": "healthcare-cardiology", "name": "Cardiology", "level": 1, "children": [], "pageCount": 12, "evidence": ["https://manipal-fixture-rm.com/specialties/cardiology/"] },
+          { "id": "healthcare-oncology", "name": "Oncology", "level": 1, "children": [], "pageCount": 15, "evidence": ["https://manipal-fixture-rm.com/specialties/oncology/"] },
+          { "id": "healthcare-neurosciences", "name": "Neurosciences", "level": 1, "children": [], "pageCount": 9, "evidence": ["https://manipal-fixture-rm.com/specialties/neurosciences/"] },
+          { "id": "healthcare-orthopedics", "name": "Orthopedics", "level": 1, "children": [], "pageCount": 7, "evidence": ["https://manipal-fixture-rm.com/specialties/orthopedics/"] },
+          { "id": "healthcare-urology", "name": "Urology", "level": 1, "children": [], "pageCount": 6, "evidence": ["https://manipal-fixture-rm.com/specialties/urology/"] },
+          { "id": "healthcare-gastroenterology", "name": "Gastroenterology", "level": 1, "children": [], "pageCount": 5, "evidence": ["https://manipal-fixture-rm.com/specialties/gastroenterology/"] }
+        ],
+        "pageCount": 54,
+        "evidence": []
+      },
+      "leafCount": 6,
+      "extractedAt": "2026-04-09T10:00:00.000Z"
+    },
+    "mapping": {
+      "entries": [
+        { "geoId": "in-ka-blr", "categoryId": "healthcare-cardiology", "strength": "strong", "evidence": ["https://manipal-fixture-rm.com/specialties/cardiology/"] },
+        { "geoId": "in-ka-blr", "categoryId": "healthcare-oncology", "strength": "strong", "evidence": ["https://manipal-fixture-rm.com/specialties/oncology/"] },
+        { "geoId": "in-ka-blr", "categoryId": "healthcare-neurosciences", "strength": "strong", "evidence": ["https://manipal-fixture-rm.com/specialties/neurosciences/"] },
+        { "geoId": "in-ka-blr", "categoryId": "healthcare-orthopedics", "strength": "moderate", "evidence": ["https://manipal-fixture-rm.com/specialties/orthopedics/"] },
+        { "geoId": "in-ka-mys", "categoryId": "healthcare-oncology", "strength": "moderate", "evidence": ["https://manipal-fixture-rm.com/locations/mysore/"] },
+        { "geoId": "in-dl-del", "categoryId": "healthcare-cardiology", "strength": "strong", "evidence": ["https://manipal-fixture-rm.com/locations/delhi/"] },
+        { "geoId": "in-mh-pune", "categoryId": "healthcare-cardiology", "strength": "moderate", "evidence": ["https://manipal-fixture-rm.com/locations/pune/"] }
+      ],
+      "totalEntries": 7,
+      "extractedAt": "2026-04-09T10:00:00.000Z"
+    }
+  }
+}

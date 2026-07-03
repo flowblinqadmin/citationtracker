@@ -1,0 +1,253 @@
+{
+  "__rm_synthetic": true,
+  "__rm_note": "ES-082 Phase A synthetic fixture authored by ReviewMaster (Agent 9). Mirrors the structure of the real Manipal site row used by the production hot-fix experiment but contains NO PII and uses test identifiers (`manipal-fixture-rm`, not the real `-GzFX1KcKhmN0W_1t8SmY`). ScriptDev should replace this with a redacted production extraction during Phase B implementation; when they do, U9's snapshot will need regeneration.",
+  "__rm_id_warning": "Do NOT use the literal site ID `-GzFX1KcKhmN0W_1t8SmY` in this file or any test fixture — that's ScriptDev's source identifier. Use `manipal-fixture-rm`.",
+
+  "id": "manipal-fixture-rm",
+  "domain": "manipalhospitals.com",
+  "slug": "manipal-fixture-rm",
+
+  "crawlData": {
+    "domain": "manipalhospitals.com",
+    "totalCrawled": 12,
+    "pages": [
+      {
+        "url": "https://www.manipalhospitals.com/",
+        "pageType": "homepage",
+        "title": "Manipal Hospitals — Multi-Specialty Healthcare in India",
+        "h1": "Manipal Hospitals",
+        "headings": [
+          { "level": 1, "text": "Manipal Hospitals" },
+          { "level": 2, "text": "World-class healthcare across India" },
+          { "level": 2, "text": "Specialties" }
+        ],
+        "content": "Manipal Hospitals is one of India's largest multi-specialty hospital chains, operating 33 hospitals across 17 cities with more than 9,500 beds and over 5,000 doctors. The network specializes in tertiary and quaternary care including cardiology, oncology, neurosciences, organ transplants, robotic surgery, and emergency medicine. Founded in 1991 in Bangalore, the group has expanded through both organic growth and acquisitions including Columbia Asia, AMRI, and Medica.",
+        "existingSchema": ["MedicalOrganization", "Hospital"],
+        "hasStructuredData": true,
+        "contactInfo": ["info@manipalhospitals.com", "+91-80-2222-1111"],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": ["NABH", "JCI"]
+      },
+      {
+        "url": "https://www.manipalhospitals.com/about-us/",
+        "pageType": "about",
+        "title": "About Manipal Hospitals",
+        "h1": "About Us",
+        "headings": [
+          { "level": 1, "text": "About Us" },
+          { "level": 2, "text": "Our Journey" },
+          { "level": 2, "text": "Our Mission" }
+        ],
+        "content": "Manipal Hospitals traces its origins to the Manipal Education and Medical Group founded in 1953. The hospital arm was incorporated in 1991 and has since grown into one of the largest healthcare providers in India. The group is recognised for its quaternary care expertise, particularly in cardiac sciences, oncology, neurosciences, organ transplantation, and robotic surgery. Multiple facilities are NABH-accredited and several flagship units carry JCI accreditation.",
+        "existingSchema": ["AboutPage"],
+        "hasStructuredData": true,
+        "contactInfo": [],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": ["NABH", "JCI"]
+      },
+      {
+        "url": "https://www.manipalhospitals.com/specialties/cardiac-sciences/",
+        "pageType": "services",
+        "title": "Cardiac Sciences — Manipal Hospitals",
+        "h1": "Cardiac Sciences",
+        "headings": [
+          { "level": 1, "text": "Cardiac Sciences" },
+          { "level": 2, "text": "Treatments and Procedures" }
+        ],
+        "content": "The Cardiac Sciences department at Manipal Hospitals offers a comprehensive range of treatments including angioplasty, coronary bypass surgery (CABG), valve replacement, electrophysiology, congenital heart defect repair, and pediatric cardiac surgery. Several Manipal facilities perform more than 4,000 cardiac procedures annually with outcome metrics that meet or exceed international benchmarks.",
+        "existingSchema": ["MedicalSpecialty"],
+        "hasStructuredData": true,
+        "contactInfo": [],
+        "faqContent": [
+          {
+            "question": "What is the success rate for angioplasty at Manipal Hospitals?",
+            "answer": "Across the network, Manipal Hospitals reports an angioplasty success rate above 99% based on internal outcomes audits over the past five years."
+          },
+          {
+            "question": "Does Manipal Hospitals offer minimally invasive cardiac surgery?",
+            "answer": "Yes — Manipal facilities perform minimally invasive valve replacements, robotic mitral repair, and transcatheter aortic valve implantation (TAVI) at multiple locations including Bangalore, Delhi, and Pune."
+          }
+        ],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://www.manipalhospitals.com/specialties/oncology/",
+        "pageType": "services",
+        "title": "Oncology — Manipal Hospitals",
+        "h1": "Oncology",
+        "headings": [
+          { "level": 1, "text": "Oncology" },
+          { "level": 2, "text": "Cancer Care Programs" }
+        ],
+        "content": "Manipal Hospitals' oncology division offers integrated cancer care including medical oncology, surgical oncology, radiation oncology, hematology, and bone marrow transplantation. The group operates dedicated cancer centres in Bangalore, Mysore, Vijayawada, and Salem with PET-CT, linear accelerators, and molecular diagnostics on-site.",
+        "existingSchema": ["MedicalSpecialty"],
+        "hasStructuredData": true,
+        "contactInfo": [],
+        "faqContent": [
+          {
+            "question": "What types of cancer are treated at Manipal Hospitals?",
+            "answer": "Manipal's oncology programme covers solid tumours, blood cancers, paediatric cancers, and rare malignancies. Tumour boards review every case to determine personalised treatment pathways."
+          }
+        ],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://www.manipalhospitals.com/team/",
+        "pageType": "team",
+        "title": "Our Team — Manipal Hospitals",
+        "h1": "Leadership and Clinical Team",
+        "headings": [
+          { "level": 1, "text": "Leadership and Clinical Team" }
+        ],
+        "content": "Dr Anil Kumar leads the Cardiac Sciences division and has over 25 years of experience in interventional cardiology. Dr Priya Raghavan heads the Oncology programme with 18 years of clinical practice in medical oncology. Dr Ravi Menon serves as Chief Medical Officer for the network.",
+        "existingSchema": [],
+        "hasStructuredData": false,
+        "contactInfo": [],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      },
+      {
+        "url": "https://www.manipalhospitals.com/contact/",
+        "pageType": "contact",
+        "title": "Contact Us — Manipal Hospitals",
+        "h1": "Contact",
+        "headings": [{ "level": 1, "text": "Contact" }],
+        "content": "Reach Manipal Hospitals at info@manipalhospitals.com or +91-80-2222-1111. Our administrative head office is located at Old Airport Road, Bangalore. For appointments, use the booking portal on the homepage.",
+        "existingSchema": ["ContactPage"],
+        "hasStructuredData": true,
+        "contactInfo": ["info@manipalhospitals.com", "+91-80-2222-1111"],
+        "faqContent": [],
+        "testimonials": [],
+        "certifications": []
+      }
+    ]
+  },
+
+  "geoScorecard": {
+    "overallScore": 64,
+    "pillars": [
+      {
+        "pillar": "metadata_freshness",
+        "pillarName": "Metadata Freshness",
+        "score": 72,
+        "findings": "Most pages have updated meta descriptions within the last 12 months.",
+        "recommendation": "Refresh remaining stale meta descriptions on legacy specialty pages.",
+        "priority": "low",
+        "impactedPages": []
+      },
+      {
+        "pillar": "semantic_html",
+        "pillarName": "Semantic HTML Structure",
+        "score": 58,
+        "findings": "Most pages use proper heading hierarchy.",
+        "recommendation": "Add article and section landmarks on long-form content pages.",
+        "priority": "medium",
+        "impactedPages": []
+      },
+      {
+        "pillar": "structured_data",
+        "pillarName": "Structured Data (Schema.org)",
+        "score": 41,
+        "findings": "MedicalOrganization and Hospital schemas present on a few pages, but coverage is incomplete across the specialty pages.",
+        "recommendation": "Add MedicalSpecialty and MedicalProcedure schemas to all specialty subpages.",
+        "priority": "high",
+        "impactedPages": ["/specialties/cardiac-sciences/", "/specialties/oncology/"]
+      },
+      {
+        "pillar": "entity_definitions",
+        "pillarName": "Entity Definitions",
+        "score": 50,
+        "findings": "Some clinical terms are defined inline, but most rely on reader familiarity.",
+        "recommendation": "Add a Key Concepts section with explicit definitions for all major procedures.",
+        "priority": "high",
+        "impactedPages": []
+      },
+      {
+        "pillar": "faq_coverage",
+        "pillarName": "FAQ Coverage",
+        "score": 28,
+        "findings": "FAQ content exists on cardiology and oncology pages only.",
+        "recommendation": "Expand FAQ coverage to all specialty pages.",
+        "priority": "high",
+        "impactedPages": []
+      },
+      {
+        "pillar": "evidence_statistics",
+        "pillarName": "Evidence & Statistics",
+        "score": 65,
+        "findings": "Procedure volumes and success rates are cited inline.",
+        "recommendation": "Add explicit source attribution for all statistics.",
+        "priority": "medium",
+        "impactedPages": []
+      },
+      {
+        "pillar": "content_structure",
+        "pillarName": "Content Structure",
+        "score": 60,
+        "findings": "Most pages follow a consistent layout.",
+        "recommendation": "Standardise layout across legacy specialty pages.",
+        "priority": "medium",
+        "impactedPages": []
+      },
+      {
+        "pillar": "author_authority",
+        "pillarName": "Author Authority (E-E-A-T)",
+        "score": 55,
+        "findings": "Named clinicians are listed on the team page but rarely on specialty pages.",
+        "recommendation": "Surface named clinicians on specialty pages with credentials and expertise.",
+        "priority": "high",
+        "impactedPages": []
+      },
+      {
+        "pillar": "internal_linking",
+        "pillarName": "Internal Linking",
+        "score": 70,
+        "findings": "Specialty pages link to each other and to the homepage.",
+        "recommendation": "Add cross-links from specialty pages to the team page.",
+        "priority": "low",
+        "impactedPages": []
+      },
+      {
+        "pillar": "content_freshness",
+        "pillarName": "Content Freshness",
+        "score": 45,
+        "findings": "Several specialty pages lack visible 'last updated' dates.",
+        "recommendation": "Surface last-updated metadata on all clinical content.",
+        "priority": "high",
+        "impactedPages": []
+      },
+      {
+        "pillar": "multi_format",
+        "pillarName": "Multi-Format Content",
+        "score": 35,
+        "findings": "Most content is text-only.",
+        "recommendation": "Add patient education videos and infographics on key specialty pages.",
+        "priority": "medium",
+        "impactedPages": []
+      },
+      {
+        "pillar": "licensing_signals",
+        "pillarName": "AI Licensing Signals",
+        "score": 0,
+        "findings": "No AI bot directives in robots.txt.",
+        "recommendation": "Add explicit User-agent directives for OAI-SearchBot, GPTBot, ClaudeBot, and PerplexityBot.",
+        "priority": "critical",
+        "impactedPages": []
+      }
+    ],
+    "topThreeImprovements": [
+      "Add MedicalSpecialty schema to all clinical pages",
+      "Expand FAQ coverage and explicit definitions on specialty subpages",
+      "Add AI bot directives to robots.txt"
+    ]
+  },
+
+  "generatedLlmsFullTxt": "# Manipal Hospitals\n\n> Manipal Hospitals is one of India's largest multi-specialty hospital networks, operating 33 hospitals across 17 cities with more than 9,500 beds and 5,000 doctors, founded in 1991 in Bangalore.\n\n## About\n\nManipal Hospitals traces its origins to the Manipal Education and Medical Group founded in 1953. The hospital arm was incorporated in 1991 in Bangalore and has grown into one of India's largest healthcare providers. The network operates 33 hospitals across 17 cities, employing more than 5,000 doctors and 9,500 beds. Manipal has expanded through organic growth and strategic acquisitions including Columbia Asia, AMRI, and Medica, strengthening its presence across northern, southern, and eastern India.\n\nThe group is recognised for quaternary care expertise, particularly in cardiac sciences, oncology, neurosciences, organ transplantation, and robotic surgery. Multiple facilities are NABH-accredited and several flagship units carry JCI accreditation. Manipal's tumour boards, multidisciplinary review processes, and outcomes-tracking infrastructure are widely regarded as among the most rigorous in the Indian private hospital sector.\n\n## Products/Services\n\n- **Cardiac Sciences**: Comprehensive interventional and surgical cardiology including angioplasty, CABG, valve replacement, electrophysiology, TAVI, and pediatric cardiac surgery — over 4,000 procedures per year network-wide.\n- **Oncology**: Integrated cancer care across medical, surgical, and radiation oncology with PET-CT, linear accelerators, and bone marrow transplantation at dedicated centres in Bangalore, Mysore, Vijayawada, and Salem.\n- **Neurosciences**: Stroke care, epilepsy surgery, deep brain stimulation, spine surgery, and neurorehabilitation across the network.\n- **Organ Transplants**: Kidney, liver, heart, and bone marrow transplant programmes with multidisciplinary teams.\n- **Robotic Surgery**: Da Vinci-assisted procedures across urology, gynaecology, cardiothoracic, and general surgery.\n- **Emergency Medicine**: 24/7 trauma centres at flagship facilities with helipad access at select sites.\n\n## Key Concepts\n\n**Quaternary Care**: refers to highly specialised consultative care that goes beyond tertiary care, typically involving experimental medicine, advanced procedures, or rare condition management requiring multidisciplinary expertise.\n\n**Tumour Board**: is a multidisciplinary case review process where oncologists, surgeons, radiologists, and pathologists collectively determine the optimal treatment pathway for a cancer patient.\n\n**TAVI**: refers to Transcatheter Aortic Valve Implantation, a minimally invasive procedure to replace a narrowed aortic valve without open-heart surgery.\n\n**NABH Accreditation**: is the National Accreditation Board for Hospitals and Healthcare Providers certification granted to facilities meeting Indian quality and safety standards.\n\n**JCI Accreditation**: refers to Joint Commission International, a US-based accreditation body whose certification is widely regarded as the global gold standard for hospital quality.\n\n## FAQ\n\nFrequently asked questions are available at:\n   - https://www.manipalhospitals.com/specialties/cardiac-sciences/\n   - https://www.manipalhospitals.com/specialties/oncology/\n\n## Team\n\n- **Dr Anil Kumar** — Head of Cardiac Sciences. Over 25 years of experience in interventional cardiology, with particular expertise in complex coronary interventions and structural heart disease.\n- **Dr Priya Raghavan** — Head of Oncology. 18 years of clinical practice in medical oncology with sub-specialisation in haematological malignancies.\n- **Dr Ravi Menon** — Chief Medical Officer. Network-level oversight of clinical quality, accreditation, and outcomes reporting.\n\n## Evidence\n\n- 4,000+ cardiac procedures performed annually network-wide (Manipal Hospitals Annual Outcomes Report).\n- 99%+ angioplasty success rate over the past five years (internal outcomes audit).\n- 33 hospitals operating across 17 Indian cities (corporate fact sheet 2025).\n- 9,500+ beds and 5,000+ doctors employed across the network (corporate fact sheet 2025).\n\n## Content\n\n- Cardiac Sciences overview — https://www.manipalhospitals.com/specialties/cardiac-sciences/\n- Oncology overview — https://www.manipalhospitals.com/specialties/oncology/\n- About Us — https://www.manipalhospitals.com/about-us/\n- Leadership Team — https://www.manipalhospitals.com/team/\n\n## Contact\n\n- Email: info@manipalhospitals.com\n- Phone: +91-80-2222-1111\n- Headquarters: Old Airport Road, Bangalore, India\n",
+
+  "generatedLlmsTxt": ""
+}

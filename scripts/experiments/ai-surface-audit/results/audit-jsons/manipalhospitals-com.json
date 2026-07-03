@@ -1,0 +1,36 @@
+{
+  "domain": "manipalhospitals.com",
+  "score": 58,
+  "max_score": 100,
+  "pages_audited": 219,
+  "audit_date": "2026-05-11",
+  "issues": [
+    {
+      "name": "No machine-readable business identity",
+      "severity": "high",
+      "time_estimate": "30 min",
+      "description": "AI tools cannot identify what this business does, where it operates, or what services it offers."
+    },
+    {
+      "name": "No review or rating signals for AI",
+      "severity": "high",
+      "time_estimate": "1 hour",
+      "description": "AI shopping agents cannot cite customer reviews or ratings when recommending this business."
+    },
+    {
+      "name": "No FAQ content formatted for AI",
+      "severity": "medium",
+      "time_estimate": "2 hours",
+      "description": "Missing FAQ content means AI cannot answer common questions about the business directly."
+    },
+    {
+      "name": "No shipping or return policy visible to AI",
+      "severity": "low",
+      "time_estimate": "30 min",
+      "description": "AI shopping agents look for commerce trust signals like shipping and return information."
+    }
+  ],
+  "projected_score_after_fixes": "90+",
+  "ai_surface_visibility": {},
+  "competitor_visibility": []
+}

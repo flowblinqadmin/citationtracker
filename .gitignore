@@ -1,0 +1,31 @@
+# Dependencies / build
+node_modules/
+.next/
+out/
+tsconfig.tsbuildinfo
+
+# Env & secrets — NEVER commit
+.env*
+!.env*.example
+.github_token
+
+# Scripts with hardcoded credentials (see CLAUDE.md hard rules)
+scripts/add-env-vars.sh
+scripts/set-vercel-env.sh
+scripts/_migrate-neon-to-supabase.mjs
+scripts/parts/
+
+# Test artifacts
+test-results/
+e2e-results/
+playwright-report/
+coverage/
+
+# OS / editor junk
+.DS_Store
+*.bak
+hsec_*
+
+# Supabase local
+supabase/.temp/
+supabase/.branches/

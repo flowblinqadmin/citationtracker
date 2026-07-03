@@ -1,0 +1,26 @@
+-- ES-wave-3 §A1 AC-A1-3 — reconcile pre_analyze_done to NOT NULL on prod.
+--
+-- Background: 20260421-add-pre-analyze-done.sql ships
+--   ADD COLUMN IF NOT EXISTS pre_analyze_done integer NOT NULL DEFAULT 0
+-- but on prod the column was applied out-of-band as nullable=YES
+-- (see ES-wave-3-schema-migration.md §A1 and the SHASTRI SURFACE block).
+-- This follow-up reconciles prod to match lib/db/schema.ts:
+--   preAnalyzeDone: integer("pre_analyze_done").notNull().default(0)
+--
+-- Idempotency: ALTER COLUMN ... SET NOT NULL is a no-op when the column is
+-- already NOT NULL. On a fresh-DB deploy that ran the original migration
+-- this statement is a safe no-op; on prod it flips the constraint.
+--
+-- Pre-flight (operator runs first against prod):
+--   SELECT column_name, data_type, is_nullable, column_default
+--   FROM information_schema.columns
+--   WHERE table_name = 'geo_sites' AND column_name = 'pre_analyze_done';
+--
+--   SELECT count(*) AS null_rows FROM geo_sites WHERE pre_analyze_done IS NULL;
+--   -- MUST return 0 before running this migration. If > 0:
+--   --   UPDATE geo_sites SET pre_analyze_done = 0 WHERE pre_analyze_done IS NULL;
+--   -- then re-check.
+--
+-- Rollback: ALTER TABLE geo_sites ALTER COLUMN pre_analyze_done DROP NOT NULL;
+
+ALTER TABLE geo_sites ALTER COLUMN pre_analyze_done SET NOT NULL;

@@ -1,0 +1,49 @@
+<!--
+  ES-090 L-2 — CSP baseline page used by U73-U75 + IT15.
+  Renders the elements the CSP must allow on dashboard / sites / verify / auth
+  paths. Any unexpected violation collected by the integration headless-Chrome
+  pass against this baseline indicates a CSP regression.
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ES-090 CSP baseline</title>
+    <link rel="stylesheet" href="/styles/baseline.css" />
+  </head>
+  <body>
+    <main>
+      <h1>CSP baseline</h1>
+
+      <!-- self image (img-src 'self') -->
+      <img src="/icon.svg" alt="logo" />
+
+      <!-- data: image (img-src data:) -->
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAA=" alt="px" />
+
+      <!-- https image (img-src https:) -->
+      <img src="https://example.com/cdn.png" alt="cdn" />
+
+      <!-- inline style (style-src 'unsafe-inline') -->
+      <p style="color: rebeccapurple">inline style</p>
+
+      <!-- self script (script-src 'self') -->
+      <script src="/js/baseline.js"></script>
+
+      <!-- inline script (script-src 'unsafe-inline') -->
+      <script>console.info("baseline-inline");</script>
+
+      <!-- supabase fetch target (connect-src *.supabase.co) -->
+      <script>fetch("https://abc.supabase.co/rest/v1/x").catch(() => {});</script>
+
+      <!-- sentry ingest target (connect-src https://*.ingest.sentry.io) -->
+      <script>fetch("https://o123.ingest.sentry.io/api/").catch(() => {});</script>
+
+      <!-- stripe -->
+      <script>fetch("https://api.stripe.com/v1/x").catch(() => {});</script>
+
+      <!-- form-action 'self' -->
+      <form action="/api/sites" method="post"><input name="x" /></form>
+    </main>
+  </body>
+</html>

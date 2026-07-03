@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252"><title>FlowBlinq GEO Dashboard — Redesign Mockup</title><style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#f5f5f7;--card:#fff;--text:#1d1d1f;--t2:#86868b;--t3:#aeaeb2;--border:#e5e5ea;--red:#ff3b30;--orange:#ff9500;--yellow:#e6b800;--green:#34c759;--blue:#007aff;--r:12px;--sh:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04)}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.hdr{background:var(--card);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.hdr-l{display:flex;align-items:center;gap:12px}
+.hdr-l .back{color:var(--blue);text-decoration:none;font-size:13px;cursor:pointer}
+.hdr-l .dom{font-weight:600;font-size:15px}
+.hdr-l .bdg{font-size:11px;font-weight:500;padding:2px 8px;border-radius:4px;background:#e8f5e9;color:#2e7d32}
+.hdr-l .si{font-size:12px;color:var(--t2)}
+.hdr-r{display:flex;align-items:center;gap:8px}
+.btn{font-size:13px;padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;font-weight:500;font-family:inherit}
+.btn-p{background:var(--blue);color:#fff;border-color:var(--blue)}
+.tabs{background:var(--card);border-bottom:1px solid var(--border);padding:0 24px;display:flex;gap:0}
+.tab{padding:10px 16px;font-size:13px;font-weight:500;color:var(--t2);cursor:pointer;border-bottom:2px solid transparent;user-select:none}
+.tab.act{color:var(--blue);border-bottom-color:var(--blue)}
+.tab:hover{color:var(--text)}
+.db{padding:16px 24px 40px;max-width:1400px;margin:0 auto}
+.ann{font-size:12px;color:var(--t2);padding:8px 0 16px;display:flex;justify-content:space-between;align-items:center}
+.ann .fs{display:flex;gap:16px;flex-wrap:wrap}
+.ann .f{display:flex;align-items:center;gap:4px}
+.ann .f strong{color:var(--text);font-weight:600}
+.sr{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px}
+.sc{background:var(--card);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);border:1px solid var(--border)}
+.sl{font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.sv{font-size:32px;font-weight:700;letter-spacing:-1px;line-height:1.1}
+.sx{font-size:12px;color:var(--t2);margin-top:4px}
+.sbm{height:4px;border-radius:2px;background:linear-gradient(to right,var(--red) 0%,var(--red) 30%,var(--orange) 30%,var(--orange) 50%,var(--yellow) 50%,var(--yellow) 70%,var(--green) 70%);margin-top:8px;position:relative}
+.sbk{position:absolute;top:-3px;width:10px;height:10px;background:var(--text);border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transform:translateX(-50%)}
+.pr{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.pp{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:600}
+.pp.z{background:#fef2f2;color:var(--red)}.pp.m{background:#fff8e1;color:#e65100}.pp.h{background:#e8f5e9;color:#2e7d32}
+.tc{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.pn{background:var(--card);border-radius:var(--r);padding:18px 20px;box-shadow:var(--sh);border:1px solid var(--border)}
+.pt{font-size:12px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px}
+.hbr{display:flex;align-items:center;margin-bottom:8px;gap:8px}
+.hbl{font-size:12px;font-weight:500;width:100px;text-align:right;flex-shrink:0}
+.hbt{flex:1;height:14px;background:#f0f0f2;border-radius:3px;overflow:hidden}
+.hbf{height:100%;border-radius:3px;transition:width .4s}
+.hbv{font-size:12px;font-weight:600;width:36px;text-align:right;flex-shrink:0}
+.fr{background:var(--red)}.fo{background:var(--orange)}.fy{background:var(--yellow)}.fg{background:var(--green)}.fgr{background:#c7c7cc}
+.sct{width:100%;border-collapse:collapse}
+.sct th{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;text-align:left;padding:0 0 8px;border-bottom:1px solid var(--border)}
+.sct th:nth-child(2),.sct td:nth-child(2){text-align:right;width:50px}
+.sct td{padding:7px 0;font-size:13px;border-bottom:1px solid #f0f0f2}
+.sct td:first-child{font-weight:500}
+.sco{font-weight:700;font-variant-numeric:tabular-nums}
+.s-r{color:var(--red)}.s-o{color:var(--orange)}.s-g{color:var(--green)}
+.sct td:nth-child(3){font-size:11px;color:var(--t2);padding-left:12px}
+.trc{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px}
+.cr{display:flex;align-items:center;margin-bottom:6px;gap:8px}
+.cl{font-size:12px;width:110px;text-align:right;flex-shrink:0;font-weight:500}
+.cl.you{font-weight:700;color:var(--blue)}
+.ct2{flex:1;height:18px;background:#f0f0f2;border-radius:4px;overflow:hidden}
+.cf{height:100%;border-radius:4px}
+.cf.yf{background:var(--blue)}.cf.of{background:#c7c7cc}
+.cv{font-size:12px;font-weight:600;width:36px;font-variant-numeric:tabular-nums}
+.gr{display:flex;align-items:center;margin-bottom:6px;gap:8px}
+.gl{font-size:12px;width:80px;text-align:right;flex-shrink:0;font-weight:500}
+.gt{flex:1;height:14px;background:#f0f0f2;border-radius:3px;overflow:hidden}
+.gf{height:100%;border-radius:3px;background:var(--blue);opacity:.7}
+.gv{font-size:12px;font-weight:600;width:36px;text-align:right}
+.ig{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:8px}
+.ii{text-align:center}
+.il{font-size:11px;color:var(--t2);font-weight:500}
+.iv{font-size:20px;font-weight:700;margin:2px 0}
+.is{font-size:10px;color:var(--t3)}
+.ri{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f2;gap:12px}
+.ri:last-child{border-bottom:none}
+.rr{font-size:12px;font-weight:700;color:var(--t3);width:20px;text-align:center;flex-shrink:0}
+.rip{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;flex-shrink:0;width:48px;text-align:center}
+.rip.hi{background:#fef2f2;color:var(--red)}.rip.me{background:#fff8e1;color:#e65100}.rip.lo{background:#f0f0f2;color:var(--t2)}
+.rn{font-size:13px;font-weight:600;flex:1}
+.rt{font-size:11px;color:var(--t2);flex-shrink:0}
+.rc{width:18px;height:18px;border:2px solid var(--border);border-radius:50%;flex-shrink:0;cursor:pointer;transition:all .15s}
+.rc:hover{border-color:var(--blue)}
+.rc.done{background:var(--green);border-color:var(--green)}
+.lk{font-size:11px;color:var(--blue);margin-top:10px;cursor:pointer}
+.mb{position:fixed;bottom:16px;right:16px;background:var(--text);color:#fff;font-size:11px;font-weight:600;padding:6px 12px;border-radius:8px;opacity:.7;z-index:999}
+.view{display:none}.view.active{display:block}
+/* Scorecard full */
+.sc-full-row{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f2;gap:12px;cursor:pointer}
+.sc-full-row:hover{background:#fafafa;margin:0 -8px;padding:10px 8px;border-radius:6px}
+.sc-name{font-size:13px;font-weight:500;width:180px;flex-shrink:0}
+.sc-bar-wrap{flex:1;height:8px;background:#f0f0f2;border-radius:4px;overflow:hidden}
+.sc-bar-fill{height:100%;border-radius:4px;transition:width .4s}
+.sc-score{font-size:14px;font-weight:700;width:32px;text-align:right;flex-shrink:0;font-variant-numeric:tabular-nums}
+.sc-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;width:52px;text-align:center;flex-shrink:0}
+.sc-badge.poor{background:#fef2f2;color:var(--red)}.sc-badge.weak{background:#fff8e1;color:#e65100}.sc-badge.fair{background:#e8f5e9;color:#2e7d32}
+.sc-desc{font-size:11px;color:var(--t2);width:280px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Rec full */
+.rec-card{background:var(--card);border-radius:var(--r);border:1px solid var(--border);box-shadow:var(--sh);margin-bottom:8px;overflow:hidden}
+.rec-header{display:flex;align-items:center;padding:14px 18px;gap:12px;cursor:pointer}
+.rec-header:hover{background:#fafafa}
+.rec-body{padding:0 18px 16px 62px;font-size:13px;color:var(--t2);line-height:1.6;display:none}
+.rec-body.open{display:block}
+.rec-action{background:#f0f7ff;border-radius:8px;padding:10px 14px;margin-top:8px;font-size:12px;line-height:1.5}
+.rec-action strong{color:var(--blue);font-weight:600}
+.rec-boost{font-size:11px;color:var(--green);font-weight:600;margin-top:8px;text-transform:uppercase}
+/* Pages table */
+.pg-controls{display:flex;align-items:center;gap:8px;margin-bottom:12px;justify-content:space-between}
+.pg-filters{display:flex;gap:4px}
+.pg-filter{font-size:12px;padding:4px 12px;border-radius:6px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-weight:500;font-family:inherit}
+.pg-filter.act{background:var(--blue);color:#fff;border-color:var(--blue)}
+.pg-search{font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);width:260px;font-family:inherit;outline:none}
+.pg-search:focus{border-color:var(--blue)}
+.pg-table{width:100%;border-collapse:collapse}
+.pg-table th{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;text-align:left;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
+.pg-table th:hover{color:var(--text)}
+.pg-table td{padding:8px 0;font-size:13px;border-bottom:1px solid #f0f0f2}
+.pg-table .url{color:var(--blue);max-width:500px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.pg-table .fixes{font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:#fef2f2;color:var(--red)}
+.pg-table .status{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase}
+.pg-table .status.nw{background:#fff8e1;color:#e65100}
+.pg-table .status.poor{background:#fef2f2;color:var(--red)}
+.pg-count{font-size:12px;color:var(--t2)}
+.pg-pag{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:16px}
+.pg-pag .btn{font-size:12px;padding:4px 10px}
+.pg-pag span{font-size:12px;color:var(--t2)}
+/* History */
+.hist-empty{text-align:center;padding:60px 20px}
+.hist-empty svg{width:64px;height:64px;margin-bottom:16px;opacity:.3}
+.hist-empty .he-title{font-size:15px;font-weight:600;margin-bottom:6px}
+.hist-empty .he-sub{font-size:13px;color:var(--t2);max-width:360px;margin:0 auto}
+.hist-row{display:flex;align-items:center;padding:12px 0;border-bottom:1px solid #f0f0f2;gap:16px}
+.hist-date{font-size:13px;font-weight:600;width:140px;flex-shrink:0}
+.hist-score{font-size:20px;font-weight:700;width:50px;flex-shrink:0}
+.hist-delta{font-size:12px;font-weight:600;width:60px;flex-shrink:0}
+.hist-delta.up{color:var(--green)}.hist-delta.dn{color:var(--red)}.hist-delta.flat{color:var(--t3)}
+.hist-bar{flex:1;height:6px;background:#f0f0f2;border-radius:3px;overflow:hidden}
+.hist-fill{height:100%;border-radius:3px}
+/* Setup */
+.setup-section{margin-bottom:24px}
+.setup-section h3{font-size:15px;font-weight:600;margin-bottom:12px}
+.setup-files{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:8px}
+.setup-file{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh)}
+.setup-file .sf-name{font-size:13px;font-weight:600;color:var(--blue);margin-bottom:2px}
+.setup-file .sf-path{font-size:11px;color:var(--t2)}
+.setup-status{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;margin-bottom:16px}
+.setup-status .dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0}
+.setup-steps{counter-reset:step}
+.setup-step{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid #f0f0f2;font-size:13px}
+.setup-step:last-child{border-bottom:none}
+.setup-step::before{counter-increment:step;content:counter(step);font-size:11px;font-weight:700;color:var(--t3);background:#f0f0f2;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.setup-code{background:#f0f0f2;border-radius:8px;padding:12px 16px;font-family:'SF Mono',Monaco,monospace;font-size:12px;margin-top:12px;display:flex;justify-content:space-between;align-items:center}
+.setup-code .copy-btn{font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;font-weight:500}
+.setup-code .copy-btn:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+.verify-btn{background:var(--text);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:12px}
+.verify-btn:hover{opacity:.85}
+.note{font-size:12px;color:var(--t2);margin-top:6px;font-style:italic}
+</style><style>
+.actions-bar{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.action-panel{background:var(--card);border-radius:var(--r);padding:18px 20px;box-shadow:var(--sh);border:1px solid var(--border);display:flex;align-items:flex-start;gap:16px}
+.action-panel .ap-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px}
+.action-panel .ap-icon.cite{background:#f0f0ff;color:#5856d6}
+.action-panel .ap-icon.comp{background:#fff0e6;color:var(--orange)}
+.action-panel .ap-body{flex:1;min-width:0}
+.action-panel .ap-title{font-size:14px;font-weight:600;margin-bottom:2px}
+.action-panel .ap-desc{font-size:12px;color:var(--t2);margin-bottom:10px;line-height:1.4}
+.action-panel .ap-btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;transition:all .15s}
+.ap-btn.cite-btn{background:#5856d6;color:#fff}
+.ap-btn.cite-btn:hover{background:#4a48c4}
+.ap-btn.comp-btn{background:var(--orange);color:#fff}
+.ap-btn.comp-btn:hover{background:#e68600}
+.ap-btn .credits{font-size:11px;opacity:.8;font-weight:500}
+.ap-last{font-size:11px;color:var(--t3);margin-top:8px}
+/* Competitor chips */
+.comp-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.comp-chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:500;padding:4px 10px;border-radius:6px;background:#f5f5f7;border:1px solid var(--border);color:var(--text)}
+.comp-chip .chip-x{font-size:14px;color:var(--t3);cursor:pointer;line-height:1;margin-left:2px}
+.comp-chip .chip-x:hover{color:var(--red)}
+.comp-input-wrap{display:flex;gap:6px;align-items:center;margin-bottom:10px}
+.comp-input{font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);flex:1;font-family:inherit;outline:none;min-width:0}
+.comp-input:focus{border-color:var(--blue)}
+.comp-input::placeholder{color:var(--t3)}
+.comp-add-btn{font-size:12px;padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;font-weight:500;white-space:nowrap;flex-shrink:0}
+.comp-add-btn:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+</style><style id="rail-styles-v2">
+/* Labeled action rail */
+.action-rail-v2{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:90;display:flex;flex-direction:column;gap:0;padding:8px 6px;background:var(--card);border-radius:0 14px 14px 0;box-shadow:0 4px 20px rgba(0,0,0,.08),0 0 0 1px rgba(0,0,0,.04);width:72px}
+.rail-item{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:10px;cursor:pointer;transition:all .15s;text-decoration:none;border:none;background:transparent;font-family:inherit}
+.rail-item:hover{background:#f0f0f2}
+.rail-item .rail-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;position:relative;transition:all .15s}
+.rail-item .rail-icon svg{width:18px;height:18px;stroke-width:1.8}
+.rail-item .rail-label{font-size:9px;font-weight:600;color:var(--t2);text-align:center;line-height:1.2;letter-spacing:.1px;transition:color .15s}
+.rail-item:hover .rail-label{color:var(--text)}
+/* Icon backgrounds */
+.rail-icon.refresh{background:#e8f5e9;color:#2e7d32}
+.rail-item:hover .rail-icon.refresh{background:#c8e6c9}
+.rail-icon.cite{background:#ede7f6;color:#5856d6}
+.rail-item:hover .rail-icon.cite{background:#d1c4e9}
+.rail-icon.compete{background:#fff3e0;color:#e65100}
+.rail-item:hover .rail-icon.compete{background:#ffe0b2}
+.rail-icon.download{background:#e3f2fd;color:#1565c0}
+.rail-item:hover .rail-icon.download{background:#bbdefb}
+/* Credit badge */
+.rail-icon .r-badge{position:absolute;top:-4px;right:-4px;font-size:8px;font-weight:700;background:var(--text);color:#fff;min-width:16px;height:14px;padding:0 3px;border-radius:7px;display:flex;align-items:center;justify-content:center;line-height:1}
+/* Separator */
+.rail-divider{width:40px;height:1px;background:var(--border);margin:4px auto}
+
+/* Adjust dashboard padding */
+.db{padding-left:92px !important}
+</style><style>
+.domain-switcher{background:var(--card);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:0;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+.domain-switcher::-webkit-scrollbar{display:none}
+.ds-label{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-right:12px;flex-shrink:0;padding:8px 0}
+.ds-pill{display:flex;align-items:center;gap:6px;padding:7px 12px;font-size:12px;font-weight:500;color:var(--t2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s;flex-shrink:0}
+.ds-pill:hover{color:var(--text);background:#fafafa}
+.ds-pill.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600}
+.ds-pill .ds-score{font-size:11px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:2px}
+.ds-pill .ds-score.poor{background:#fef2f2;color:var(--red)}
+.ds-pill .ds-score.weak{background:#fff8e1;color:#e65100}
+.ds-pill .ds-score.fair{background:#e8f5e9;color:#2e7d32}
+</style><link rel="stylesheet" href="./GEODashboardRedesignMockupFinal_files/css2"><style id="flowblinq-v2">
+
+/* ===== FONT: Inter everywhere ===== */
+body, *, .tab, .pt, .hbl, .hbv, .sct th, .sct td,
+.kpi, .kpi-label, .comp-chip, button, input {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+}
+code, pre, .mono, [class*="mono"], .code-block, .dns-val {
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace !important;
+}
+
+/* ===== HEADER: Warm white, centered brand ===== */
+.hdr {
+  background: #FAF9F5 !important;
+  border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+  height: 56px !important;
+  position: relative !important;
+  justify-content: space-between !important;
+}
+
+/* Left side: back link + domain */
+.hdr-l .back {
+  color: #C2652A !important;
+}
+
+.hdr-l .dom {
+  color: #1d1d1f !important;
+}
+
+/* Center brand mark — we'll add this via DOM */
+.hdr-brand-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #C2652A;
+  pointer-events: none;
+}
+
+.hdr-brand-center svg {
+  flex-shrink: 0;
+}
+
+/* Right side: buttons */
+.hdr-r .dl-btn {
+  background: #C2652A !important;
+  border-color: #C2652A !important;
+  color: #FFFFFF !important;
+}
+.hdr-r .dl-btn:hover {
+  background: #A8561F !important;
+}
+
+/* ===== TABS: Remove History, style with copper active ===== */
+.tab.act, .tab.active {
+  border-bottom-color: #C2652A !important;
+  color: #1d1d1f !important;
+}
+
+/* ===== DOMAIN SWITCHER: copper for active ===== */
+.domain-switcher .site-item.active,
+.domain-switcher .site-item.act {
+  color: #C2652A !important;
+  border-bottom-color: #C2652A !important;
+}
+
+/* ===== COMPETITOR STRIP — REDESIGNED ===== */
+.comp-strip {
+  display: none !important; /* hide original */
+}
+
+.comp-bar {
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 8px;
+  padding: 12px 18px;
+  margin: 16px 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.comp-bar-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #aeaeb2;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.comp-bar .cb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: #f5f5f7;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1d1d1f;
+  cursor: default;
+  transition: all 0.15s;
+}
+
+.comp-bar .cb-chip:hover {
+  border-color: rgba(0,0,0,0.12);
+  background: #f0f0f2;
+}
+
+.comp-bar .cb-chip .cb-x {
+  font-size: 11px;
+  color: #aeaeb2;
+  cursor: pointer;
+  margin-left: 2px;
+}
+
+.comp-bar .cb-chip .cb-x:hover {
+  color: #ff3b30;
+}
+
+.comp-bar .cb-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: transparent;
+  border: 1px dashed rgba(0,0,0,0.15);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #86868b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.comp-bar .cb-add:hover {
+  border-color: #C2652A;
+  color: #C2652A;
+}
+
+/* ===== TIMELINE BAR ===== */
+.timeline-bar {
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.timeline-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #aeaeb2;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.timeline-track {
+  flex: 1;
+  height: 32px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.timeline-line {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #e5e5ea;
+  transform: translateY(-50%);
+}
+
+.timeline-point {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 1;
+}
+
+.timeline-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #C2652A;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.08);
+}
+
+.timeline-dot.future {
+  background: #e5e5ea;
+}
+
+.timeline-date {
+  font-size: 10px;
+  color: #86868b;
+  white-space: nowrap;
+  margin-top: 4px;
+}
+
+.timeline-score {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1d1d1f;
+  margin-bottom: 4px;
+}
+
+.timeline-cta {
+  font-size: 11px;
+  color: #86868b;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-style: italic;
+}
+
+/* ===== VIEW ALL LINKS: copper ===== */
+.view-all, a.view-all {
+  color: #C2652A !important;
+}
+
+/* ===== TABLE SORTED: copper ===== */
+.sct th.sorted, th.sorted {
+  color: #C2652A !important;
+}
+
+/* ===== TABLE HOVER: warm ===== */
+.sct tbody tr:hover, table tbody tr:hover {
+  background: rgba(194, 101, 42, 0.03) !important;
+}
+
+/* ===== INPUT FOCUS: copper ===== */
+input[type="text"]:focus {
+  border-color: #C2652A !important;
+  box-shadow: 0 0 0 3px rgba(194, 101, 42, 0.08) !important;
+  outline: none !important;
+}
+
+/* ===== REC ACTION BUTTON: copper ===== */
+.rec-action {
+  background: #C2652A !important;
+  border-color: #C2652A !important;
+  color: #FFFFFF !important;
+}
+
+/* ===== VERIFY/COPY: copper ===== */
+.verify-btn, button.verify, .setup-verify {
+  background: #C2652A !important;
+  border-color: #C2652A !important;
+  color: #FFFFFF !important;
+}
+
+/* ===== SIDEBAR BUTTONS: keep as-is but copper on hover ===== */
+.sb-btn:hover, .action-rail-v2 button:hover {
+  border-color: #C2652A !important;
+  color: #C2652A !important;
+}
+
+</style><style id="flowblinq-brand-fix">
+.hdr-brand-center {
+  font-size: 17px !important;
+  letter-spacing: 3px !important;
+  gap: 10px !important;
+}
+
+/* 3. Hide the domain switcher strip */
+.domain-switcher {
+  display: none !important;
+}
+
+/* 4. Style the domain name + chevron in header */
+.hdr-l .dom {
+  cursor: pointer;
+  position: relative;
+}
+
+.dom-chevron {
+  display: inline-block;
+  font-size: 10px;
+  color: #aeaeb2;
+  margin-left: 6px;
+  vertical-align: middle;
+  transition: transform 0.15s;
+}
+
+.hdr-l .dom:hover .dom-chevron {
+  color: #C2652A;
+}
+
+/* Domain selector popover (hidden by default) */
+.dom-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 8px;
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+  min-width: 320px;
+  padding: 6px 0;
+  z-index: 200;
+  display: none;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.dom-popover.show {
+  display: block;
+}
+
+.dom-popover-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.1s;
+  font-size: 13px;
+}
+
+.dom-popover-item:hover {
+  background: rgba(194, 101, 42, 0.04);
+}
+
+.dom-popover-item.active {
+  background: rgba(194, 101, 42, 0.06);
+  font-weight: 600;
+}
+
+.dom-popover-item .dpi-name {
+  color: #1d1d1f;
+}
+
+.dom-popover-item .dpi-score {
+  font-weight: 700;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dom-popover-item .dpi-pages {
+  font-size: 11px;
+  color: #aeaeb2;
+  margin-left: 4px;
+}
+
+.dom-popover-search {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  margin-bottom: 2px;
+}
+
+.dom-popover-search input {
+  width: 100%;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  outline: none;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.dom-popover-search input:focus {
+  border-color: #C2652A;
+  box-shadow: 0 0 0 3px rgba(194, 101, 42, 0.08);
+}
+
+/* Reclaim the space from removed domain strip */
+.db {
+  margin-top: 0 !important;
+}
+</style><style id="logo-align-fix">
+.hdr-brand-center {
+  display: flex !important;
+  align-items: center !important;
+}
+.hdr-brand-center img {
+  position: relative !important;
+  top: 1px !important;
+}
+</style><style>
+/* ── Audit Status Bar (Live Activity inspired) ── */
+.audit-status-bar {
+  background: linear-gradient(135deg, #fffbf5 0%, #fff7ed 100%);
+  border-bottom: 1px solid #f0e6d9;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  position: sticky;
+  top: 52px;
+  z-index: 99;
+  box-shadow: 0 1px 3px rgba(194, 101, 42, 0.08);
+}
+
+.asb-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.asb-pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #c2652a;
+  flex-shrink: 0;
+  animation: asb-pulse 1.5s ease-in-out infinite;
+}
+@keyframes asb-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+.asb-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c2652a;
+}
+
+.asb-subtitle {
+  font-size: 11px;
+  color: var(--t2);
+  margin-top: 1px;
+}
+
+/* Pipeline in the status bar */
+.asb-pipeline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: 1;
+  max-width: 600px;
+}
+
+.asb-step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.asb-step.done { color: var(--green); font-weight: 500; }
+.asb-step.active { color: #c2652a; font-weight: 700; }
+.asb-step.pending { color: var(--t3); }
+
+.asb-step .asb-circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  flex-shrink: 0;
+}
+.asb-step.done .asb-circle {
+  background: #e8f5e9;
+  color: var(--green);
+}
+.asb-step.active .asb-circle {
+  background: #fff3e0;
+  color: #c2652a;
+  box-shadow: 0 0 0 2px rgba(194, 101, 42, 0.2);
+  animation: asb-pulse 1.5s ease-in-out infinite;
+}
+.asb-step.pending .asb-circle {
+  background: #f5f5f7;
+  color: var(--t3);
+}
+
+.asb-connector {
+  width: 20px;
+  height: 2px;
+  border-radius: 1px;
+  flex-shrink: 0;
+  margin: 0 2px;
+}
+.asb-connector.done { background: var(--green); }
+.asb-connector.active { background: linear-gradient(90deg, var(--green), #c2652a); }
+.asb-connector.pending { background: var(--border); }
+
+/* Right side: progress + ETA */
+.asb-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.asb-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.asb-progress-bar {
+  width: 80px;
+  height: 4px;
+  background: #f0e6d9;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.asb-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: #c2652a;
+  transition: width 0.5s ease;
+}
+
+.asb-pct {
+  font-size: 12px;
+  font-weight: 700;
+  color: #c2652a;
+  font-variant-numeric: tabular-nums;
+}
+
+.asb-eta {
+  font-size: 10px;
+  color: var(--t2);
+}
+</style><style>
+/* Subtle shimmer on KPI cards during refresh */
+.audit-status-bar ~ .tabs ~ .domain-switcher ~ .db .kpi-card {
+  position: relative;
+}
+.audit-status-bar ~ .tabs ~ .domain-switcher ~ .db .kpi-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(194, 101, 42, 0.03), transparent);
+  animation: shimmer 3s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* Update hint badge */
+.update-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--t2);
+  background: rgba(194, 101, 42, 0.06);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+</style><style>
+/* Credits badge - prominent, clickable */
+.credits-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #c2652a, #d4803e);
+  color: #fff;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  border: none;
+}
+.credits-badge:hover {
+  background: linear-gradient(135deg, #a85522, #c2652a);
+  box-shadow: 0 2px 8px rgba(194, 101, 42, 0.3);
+  transform: translateY(-1px);
+}
+.credits-badge .credits-icon {
+  font-size: 11px;
+}
+.credits-badge .credits-num {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+</style></head><body>
+<div class="action-rail-v2" id="actionRail" style="width: 78px; padding: 12px 6px; gap: 4px; border-radius: 0px 14px 14px 0px;">
+  <button class="rail-item" style="padding: 8px 4px; width: 66px; border-radius: 10px;">
+    <div class="rail-icon refresh">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+    </div>
+    <span class="rail-label" style="font-size: 9px; line-height: 1.2; margin-top: 4px; letter-spacing: 0.2px;">Refresh<br>Score</span>
+  </button>
+  <button class="rail-item" style="padding: 8px 4px; width: 66px; border-radius: 10px;">
+    <div class="rail-icon cite"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="11" cy="11" r="3"></circle>
+  <path d="M18 11a7 7 0 1 0-2.8 5.6"></path>
+  <path d="M14 11v2.5c0 .8.7 1.5 1.5 1.5"></path>
+  <path d="M15.2 16.6 L 22 16.6"></path>
+  <polyline points="19.5 14.3 22 16.6 19.5 18.9"></polyline>
+</svg>
+      
+      
+    </div>
+    <span class="rail-label" style="font-size: 9px; line-height: 1.2; margin-top: 4px; letter-spacing: 0.2px;">Scan<br>Citations</span>
+  <span class="r-badge" style="font-size: 8px; padding: 1px 5px; border-radius: 4px; background: rgba(194, 101, 42, 0.08); color: rgb(194, 101, 42); position: static; top: 0px; right: 0px; transform: none; display: inline-block; margin-top: 2px; font-weight: 500; letter-spacing: 0.3px;">5cr</span></button>
+  <button class="rail-item" style="padding: 8px 4px; width: 66px; border-radius: 10px;">
+    <div class="rail-icon compete">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><path d="M20 8v6"></path><path d="M23 11h-6"></path></svg>
+      
+    </div>
+    <span class="rail-label" style="font-size: 9px; line-height: 1.2; margin-top: 4px; letter-spacing: 0.2px;">Map<br>Competitors</span>
+  <span class="r-badge" style="font-size: 8px; padding: 1px 5px; border-radius: 4px; background: rgba(194, 101, 42, 0.08); color: rgb(194, 101, 42); position: static; top: 0px; right: 0px; transform: none; display: inline-block; margin-top: 2px; font-weight: 500; letter-spacing: 0.3px;">2cr</span></button>
+  <div class="rail-divider"></div>
+  <div class="rail-sep" style="height: 1px; background: rgb(229, 229, 234); margin: 4px 10px; flex-shrink: 0;"></div><button class="rail-item" style="padding: 8px 4px; width: 66px; border-radius: 10px;">
+    <div class="rail-icon download">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+    </div>
+    <span class="rail-label" style="font-size: 9px; line-height: 1.2; margin-top: 4px; letter-spacing: 0.2px;">Download<br>ZIP</span>
+  </button><button class="rail-item" style="padding: 8px 4px; width: 66px; border-radius: 10px;">
+    <div class="rail-icon" style="width:32px;height:32px;border-radius:8px;background:#f5f5f7;display:flex;align-items:center;justify-content:center;">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
+    </div>
+    <span class="rail-label" style="font-size: 9px; margin-top: 4px; color: rgb(134, 134, 139); line-height: 1.2; letter-spacing: 0.2px;">Download<br>Report</span>
+  </button>
+</div>
+<div id="app">
+<!-- HEADER -->
+<div class="hdr" style="padding: 10px 24px;">
+<div class="hdr-l" style="flex-direction: row; align-items: center; gap: 0px;"><span class="back" style="font-size: 22px; font-weight: 300; color: rgb(134, 134, 139); cursor: pointer; padding: 0px 8px 0px 0px; line-height: 1; transition: color 0.15s;">‹</span><span class="dom" style="position: relative; cursor: pointer; font-size: 15px; font-weight: 600; color: rgb(29, 29, 31);">manipalhospitals.com<span class="dom-chevron">▾</span><div class="dom-popover">
+    <div class="dom-popover-search"><input type="text" placeholder="Search domains..."></div>
+    
+      <div class="dom-popover-item ">
+        <span class="dpi-name">flowblinq.com<span class="dpi-pages">34 pages</span></span>
+        <span class="dpi-score" style="color: #34c759">64</span>
+      </div>
+    
+      <div class="dom-popover-item ">
+        <span class="dpi-name">sebamed.com<span class="dpi-pages">82 pages</span></span>
+        <span class="dpi-score" style="color: #ff9500">57</span>
+      </div>
+    
+      <div class="dom-popover-item ">
+        <span class="dpi-name">nilehq.com<span class="dpi-pages">28 pages</span></span>
+        <span class="dpi-score" style="color: #ff9500">56</span>
+      </div>
+    
+      <div class="dom-popover-item ">
+        <span class="dpi-name">cetaphil.in<span class="dpi-pages">45 pages</span></span>
+        <span class="dpi-score" style="color: #ff9500">56</span>
+      </div>
+    
+      <div class="dom-popover-item ">
+        <span class="dpi-name">manipaltrutest.com<span class="dpi-pages">61 pages</span></span>
+        <span class="dpi-score" style="color: #ff9500">51</span>
+      </div>
+    
+      <div class="dom-popover-item ">
+        <span class="dpi-name">tharaalabs.com<span class="dpi-pages">22 pages</span></span>
+        <span class="dpi-score" style="color: #ff9500">49</span>
+      </div>
+    
+      <div class="dom-popover-item ">
+        <span class="dpi-name">sebamedindia.com<span class="dpi-pages">55 pages</span></span>
+        <span class="dpi-score" style="color: #ff9500">47</span>
+      </div>
+    
+      <div class="dom-popover-item active">
+        <span class="dpi-name">manipalhospitals.com<span class="dpi-pages">99 pages</span></span>
+        <span class="dpi-score" style="color: #ff3b30">45</span>
+      </div>
+    
+      <div class="dom-popover-item ">
+        <span class="dpi-name">en.wikipedia.org<span class="dpi-pages">12 pages</span></span>
+        <span class="dpi-score" style="color: #ff3b30">44</span>
+      </div>
+    
+      <div class="dom-popover-item ">
+        <span class="dpi-name">creativeallergy.com<span class="dpi-pages">18 pages</span></span>
+        <span class="dpi-score" style="color: #ff3b30">32</span>
+      </div>
+    
+      <div class="dom-popover-item ">
+        <span class="dpi-name">ebay.com<span class="dpi-pages">8 pages</span></span>
+        <span class="dpi-score" style="color: #ff3b30">29</span>
+      </div>
+    
+  </div></span></div>
+<div class="hdr-r">
+  <a class="credits-badge" href="#checkout" title="Buy more credits">
+    <span class="credits-icon">✦</span>
+    <span class="credits-num">8,983</span> credits
+  </a>
+  <button class="btn" style="font-size:12px;color:var(--t2)">Sign out</button>
+</div>
+<div class="hdr-brand-center"><img src="./GEODashboardRedesignMockupFinal_files/logo.png" alt="FlowBlinq" style="width: 24px; height: 24px; border-radius: 3px; position: relative; top: -3px;">FLOWBLINQ GEO</div></div><div class="audit-status-bar">
+  <div class="asb-left">
+    <div class="asb-pulse"></div>
+    <div>
+      <div class="asb-title">Refreshing audit</div>
+      <div class="asb-subtitle">99 pages · started 1 min ago</div>
+    </div>
+  </div>
+  
+  <div class="asb-pipeline">
+    <div class="asb-step done">
+      <div class="asb-circle">✓</div>
+      <span>Connect</span>
+    </div>
+    <div class="asb-connector done"></div>
+    <div class="asb-step done">
+      <div class="asb-circle">✓</div>
+      <span>Read</span>
+    </div>
+    <div class="asb-connector active"></div>
+    <div class="asb-step active">
+      <div class="asb-circle">3</div>
+      <span>Landscape</span>
+    </div>
+    <div class="asb-connector pending"></div>
+    <div class="asb-step pending">
+      <div class="asb-circle">4</div>
+      <span>Audit</span>
+    </div>
+    <div class="asb-connector pending"></div>
+    <div class="asb-step pending">
+      <div class="asb-circle">5</div>
+      <span>Profile</span>
+    </div>
+    <div class="asb-connector pending"></div>
+    <div class="asb-step pending">
+      <div class="asb-circle">6</div>
+      <span>Finalize</span>
+    </div>
+  </div>
+  
+  <div class="asb-right">
+    <div class="asb-progress-wrap">
+      <div class="asb-progress-bar">
+        <div class="asb-progress-fill" style="width:42%"></div>
+      </div>
+      <span class="asb-pct">42%</span>
+    </div>
+    <span class="asb-eta">~2 min remaining</span>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs" id="tabBar">
+<div class="tab act" data-tab="overview" style="cursor: pointer;">Overview</div>
+<div class="tab" data-tab="scorecard" style="cursor: pointer;">Scorecard</div>
+<div class="tab" data-tab="recs" style="cursor: pointer;">Recommendations</div>
+<div class="tab" data-tab="pages" style="cursor: pointer;">Pages</div>
+<div class="tab" data-tab="history" style="cursor: pointer;">History</div>
+<div class="tab" data-tab="setup" style="cursor: pointer;">Setup</div>
+</div>
+<div class="domain-switcher">
+  <span class="ds-label">Sites</span>
+  <span class="ds-pill"><span>flowblinq.com</span><span class="ds-score fair">64</span></span>
+  <span class="ds-pill"><span>sebamed.com</span><span class="ds-score fair">57</span></span>
+  <span class="ds-pill"><span>nilehq.com</span><span class="ds-score fair">56</span></span>
+  <span class="ds-pill"><span>cetaphil.in</span><span class="ds-score fair">56</span></span>
+  <span class="ds-pill"><span>manipaltrutest.com</span><span class="ds-score fair">51</span></span>
+  <span class="ds-pill"><span>tharaalabs.com</span><span class="ds-score weak">49</span></span>
+  <span class="ds-pill"><span>sebamedindia.com</span><span class="ds-score weak">47</span></span>
+  <span class="ds-pill active" style=""><span style="">manipalhospitals.com</span><span class="ds-score weak">45</span></span>
+  <span class="ds-pill"><span>en.wikipedia.org</span><span class="ds-score weak">44</span></span>
+  <span class="ds-pill"><span>creativeallergy.com</span><span class="ds-score weak">32</span></span>
+  <span class="ds-pill"><span>ebay.com</span><span class="ds-score poor">29</span></span>
+</div>
+
+<div class="db">
+<!-- ANNOTATION -->
+<div class="ann">
+<div class="fs">
+<span class="f"><strong>99</strong> pages crawled</span>
+<span class="f"><strong>108</strong> Q&amp;A moments</span>
+<span class="f"><strong>16</strong> pillars</span>
+<span class="f"><strong>7</strong> critical issues</span>
+<span class="f">Last scanned <strong>Mar 23, 2026</strong></span>
+</div>
+<div style="font-size: 12px; color: rgb(134, 134, 139); font-family: Inter, sans-serif;">— first scan</div>
+<span class="update-hint">↻ Scores will update when scan completes</span></div>
+
+<!-- ==================== OVERVIEW TAB ==================== -->
+<div class="view" id="view-overview" style="display: block;">
+<div class="sr">
+<div class="sc"><div class="sl">AI Visibility</div><div class="sv" style="color:var(--orange)">48%</div><div class="sx">Moderate · Indirect 45% / Direct 58%</div></div>
+<div class="sc"><div class="sl">GEO Audit Score</div><div class="sv" style="color:var(--red)">45<span style="font-size:18px;color:var(--t3)">/100</span></div><div class="sbm"><div class="sbk" style="left:45%"></div></div><div class="sx">Est. after fixes: 72</div></div>
+<div class="sc"><div class="sl">Citation Rate</div><div class="sv" style="color:var(--orange)">59%</div><div class="pr"><span class="pp z">Perplexity 0/44</span><span class="pp m">OpenAI 29/44</span><span class="pp h">Anthropic 34/44</span></div></div>
+<div class="sc"><div class="sl">Competitive SOV</div><div class="sv" style="color:var(--blue)">45%</div><div class="sx">Leading · Apollo 29%, Max 9%</div></div>
+<div class="sc"><div class="sl">Citation Quality</div><div class="sv" style="color:var(--green)">80%</div><div class="sx">When cited, quality is high</div></div>
+</div><div class="comp-bar">
+    <span class="comp-bar-label">Comparing against</span>
+    <span class="cb-chip">Fortis Healthcare<span class="cb-x">×</span></span><span class="cb-chip">Medanta<span class="cb-x">×</span></span><span class="cb-chip">Max Healthcare<span class="cb-x">×</span></span><span class="cb-chip">Apollo Hospitals<span class="cb-x">×</span></span><span class="cb-chip">Care.com<span class="cb-x">×</span></span><span class="cb-chip">Narayana Health<span class="cb-x">×</span></span>
+    <span class="cb-add">+ Add competitor</span>
+  </div><div class="timeline-bar">
+    <span class="timeline-label">Score History</span>
+    <div class="timeline-track">
+      <div class="timeline-line"></div>
+      <div style="display: flex; align-items: flex-end; justify-content: flex-start; width: 100%; position: relative; padding: 0 8px;">
+        <div class="timeline-point" style="position: relative;">
+          <div class="timeline-score">45</div>
+          <div class="timeline-dot"></div>
+          <div class="timeline-date">Mar 23</div>
+        </div>
+        <div style="flex: 1;"></div>
+        <div class="timeline-point" style="position: relative; opacity: 0.4;">
+          <div class="timeline-score" style="color: #aeaeb2;">—</div>
+          <div class="timeline-dot future"></div>
+          <div class="timeline-date">Next scan</div>
+        </div>
+      </div>
+    </div>
+    <span class="timeline-cta">Run additional scans to track progress</span>
+  </div>
+<div class="comp-strip" id="compStrip2">
+  <span class="comp-strip-label">vs.</span>
+  <span class="comp-chip">Fortis Healthcare <span class="chip-x" onclick="removeChip2(this)">×</span></span>
+  <span class="comp-chip">Medanta <span class="chip-x" onclick="removeChip2(this)">×</span></span>
+  <span class="comp-chip">Max Healthcare <span class="chip-x" onclick="removeChip2(this)">×</span></span>
+  <span class="comp-chip">Apollo Hospitals <span class="chip-x" onclick="removeChip2(this)">×</span></span>
+  <span class="comp-chip">Care.com <span class="chip-x" onclick="removeChip2(this)">×</span></span>
+  <span class="comp-chip">Narayana Health <span class="chip-x" onclick="removeChip2(this)">×</span></span><input class="comp-input-inline" id="compInput2" type="text" placeholder="+ add competitor...">
+</div>
+
+<div class="tc">
+<div class="pn"><div class="pt">Citation Visibility by Theme</div>
+<div class="hbr"><span class="hbl">Licensing</span><div class="hbt"><div class="hbf fgr" style="width:1%"></div></div><span class="hbv" style="color:var(--red)">0%</span></div>
+<div class="hbr"><span class="hbl">CTA</span><div class="hbt"><div class="hbf fgr" style="width:1%"></div></div><span class="hbv" style="color:var(--red)">0%</span></div>
+<div class="hbr"><span class="hbl">Trust</span><div class="hbt"><div class="hbf fr" style="width:22%"></div></div><span class="hbv" style="color:var(--red)">22%</span></div>
+<div class="hbr"><span class="hbl">Evidence</span><div class="hbt"><div class="hbf fo" style="width:43%"></div></div><span class="hbv" style="color:var(--orange)">43%</span></div>
+<div class="hbr"><span class="hbl">Positioning</span><div class="hbt"><div class="hbf fo" style="width:52%"></div></div><span class="hbv" style="color:var(--orange)">52%</span></div>
+<div class="hbr"><span class="hbl">Clarity</span><div class="hbt"><div class="hbf fy" style="width:58%"></div></div><span class="hbv" style="color:#b8860b">58%</span></div>
+<div class="hbr"><span class="hbl">Authority</span><div class="hbt"><div class="hbf fg" style="width:67%"></div></div><span class="hbv" style="color:var(--green)">67%</span></div>
+<div style="font-size:11px;color:var(--t3);margin-top:10px">2 themes with zero visibility — highest-priority opportunities</div>
+</div>
+<div class="pn"><div class="pt">GEO Audit — Critical Issues <span style="font-weight:400;color:var(--t3)">(7 of 16 pillars)</span></div>
+<table class="sct"><thead><tr><th>Pillar</th><th>Score</th><th>Finding</th></tr></thead><tbody>
+<tr><td>Competitive Positioning</td><td class="sco s-r">10</td><td>No /compare/ or /vs/ pages</td></tr>
+<tr><td>Author Authority</td><td class="sco s-r">15</td><td>Attributed to departments, not doctors</td></tr>
+<tr><td>Multi-Format Content</td><td class="sco s-r">28</td><td>Primarily text, no transcripts for video</td></tr>
+<tr><td>Evidence &amp; Statistics</td><td class="sco s-r">30</td><td>Outdated stats (2019 data still cited)</td></tr>
+<tr><td>Content Freshness</td><td class="sco s-r">30</td><td>Bulk of blog content from late 2019</td></tr>
+<tr><td>Semantic HTML</td><td class="sco s-o">35</td><td>Multiple H1 tags, broken heading hierarchy</td></tr>
+<tr><td>Metadata Freshness</td><td class="sco s-o">38</td><td>No sitemap.xml found</td></tr>
+</tbody></table>
+<div class="lk" onclick="switchTab('scorecard')" style="font-family: Inter, sans-serif; color: rgb(194, 101, 42);">View all 16 pillars →</div>
+</div></div>
+<div class="trc">
+<div class="pn"><div class="pt">Share of Voice</div>
+<div class="cr"><span class="cl you">You</span><div class="ct2"><div class="cf yf" style="width:45%"></div></div><span class="cv">45%</span></div>
+<div class="cr"><span class="cl">Apollo Hosp.</span><div class="ct2"><div class="cf of" style="width:29%"></div></div><span class="cv">29%</span></div>
+<div class="cr"><span class="cl">Max Healthcare</span><div class="ct2"><div class="cf of" style="width:9%"></div></div><span class="cv">9%</span></div>
+<div class="cr"><span class="cl">Fortis</span><div class="ct2"><div class="cf of" style="width:8%"></div></div><span class="cv">8%</span></div>
+<div class="cr"><span class="cl">Medanta</span><div class="ct2"><div class="cf of" style="width:2%"></div></div><span class="cv">2%</span></div>
+</div>
+<div class="pn"><div class="pt">Geographic Performance</div>
+<div class="gr"><span class="gl">India</span><div class="gt"><div class="gf" style="width:17%"></div></div><span class="gv">17%</span></div>
+<div class="gr"><span class="gl">Karnataka</span><div class="gt"><div class="gf" style="width:56%"></div></div><span class="gv">56%</span></div>
+<div class="gr"><span class="gl">Bangalore</span><div class="gt"><div class="gf" style="width:61%"></div></div><span class="gv">61%</span></div>
+<div style="height:14px"></div>
+<div class="pt">Category Performance</div>
+<div class="gr"><span class="gl">hiv</span><div class="gt"><div class="gf" style="width:37%;background:var(--orange)"></div></div><span class="gv">37%</span></div>
+<div class="gr"><span class="gl">cervical ca.</span><div class="gt"><div class="gf" style="width:40%;background:var(--orange)"></div></div><span class="gv">40%</span></div>
+<div class="gr"><span class="gl">heart disease</span><div class="gt"><div class="gf" style="width:52%;background:var(--orange)"></div></div><span class="gv">52%</span></div>
+<div class="gr"><span class="gl">breast ca.</span><div class="gt"><div class="gf" style="width:53%;background:var(--orange)"></div></div><span class="gv">53%</span></div>
+</div>
+<div class="pn"><div class="pt">Buyer Intent Coverage</div>
+<div class="ig"><div class="ii"><div class="il">Buy</div><div class="iv" style="color:var(--red)">33%</div><div class="is">7/21 prompts</div></div>
+<div class="ii"><div class="il">Solve</div><div class="iv" style="color:var(--orange)">45%</div><div class="is">19/42 prompts</div></div>
+<div class="ii"><div class="il">Learn</div><div class="iv" style="color:var(--orange)">51%</div><div class="is">23/45 prompts</div></div></div>
+<div style="height:16px"></div>
+<div class="pt">Top Recommendations</div>
+<div class="ri"><div class="rc"></div><span class="rr">1</span><span class="rip hi">HIGH</span><span class="rn">Author Authority</span><span class="rt">1–2 hrs</span></div>
+<div class="ri"><div class="rc"></div><span class="rr">2</span><span class="rip hi">HIGH</span><span class="rn">Content Freshness</span><span class="rt">30 min</span></div>
+<div class="ri"><div class="rc"></div><span class="rr">3</span><span class="rip me">MED</span><span class="rn">Evidence &amp; Statistics</span><span class="rt">30 min</span></div>
+<div class="ri"><div class="rc"></div><span class="rr">4</span><span class="rip hi">HIGH</span><span class="rn">Semantic HTML</span><span class="rt">30 min</span></div>
+<div class="lk" onclick="switchTab('recs')" style="font-family: Inter, sans-serif; color: rgb(194, 101, 42);">View all 10 recommendations →</div>
+</div></div>
+</div>
+<!-- END OVERVIEW -->
+<div class="view" id="view-scorecard" style="display: none;">
+<div class="pn" style="margin-bottom:16px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+<div class="pt" style="margin-bottom:0">All 16 Pillars</div>
+<div style="display:flex;gap:4px">
+<span class="pg-filter act" onclick="filterScorecard('all',this)" style="border-color: rgb(194, 101, 42);">All</span>
+<span class="pg-filter" onclick="filterScorecard('poor',this)">Poor (5)</span>
+<span class="pg-filter" onclick="filterScorecard('weak',this)">Weak (3)</span>
+<span class="pg-filter" onclick="filterScorecard('fair',this)">Fair (8)</span>
+</div>
+</div>
+<div id="scorecard-list">
+<div class="sc-full-row" data-tier="poor"><span class="sc-name">Competitive Positioning</span><div class="sc-bar-wrap"><div class="sc-bar-fill fr" style="width:10%"></div></div><span class="sc-score s-r">10</span><span class="sc-badge poor">Poor</span><span class="sc-desc">No dedicated /compare/ or /vs/ subdirectories</span></div>
+<div class="sc-full-row" data-tier="poor"><span class="sc-name">Author Authority</span><div class="sc-bar-wrap"><div class="sc-bar-fill fr" style="width:15%"></div></div><span class="sc-score s-r">15</span><span class="sc-badge poor">Poor</span><span class="sc-desc">Blog posts attributed to departments, not named authors</span></div>
+<div class="sc-full-row" data-tier="poor"><span class="sc-name">Multi-Format Content</span><div class="sc-bar-wrap"><div class="sc-bar-fill fr" style="width:28%"></div></div><span class="sc-score s-r">28</span><span class="sc-badge poor">Poor</span><span class="sc-desc">Primarily text with some images, no video transcripts</span></div>
+<div class="sc-full-row" data-tier="poor"><span class="sc-name">Evidence &amp; Statistics</span><div class="sc-bar-wrap"><div class="sc-bar-fill fr" style="width:30%"></div></div><span class="sc-score s-r">30</span><span class="sc-badge poor">Poor</span><span class="sc-desc">Statistics often outdated (e.g., 2019 data still cited)</span></div>
+<div class="sc-full-row" data-tier="poor"><span class="sc-name">Content Freshness</span><div class="sc-bar-wrap"><div class="sc-bar-fill fr" style="width:30%"></div></div><span class="sc-score s-r">30</span><span class="sc-badge poor">Poor</span><span class="sc-desc">Significant portion of blog content dates back to late 2019</span></div>
+<div class="sc-full-row" data-tier="weak"><span class="sc-name">Semantic HTML</span><div class="sc-bar-wrap"><div class="sc-bar-fill fo" style="width:35%"></div></div><span class="sc-score s-o">35</span><span class="sc-badge weak">Weak</span><span class="sc-desc">Multiple H1 tags, heading levels frequently skipped</span></div>
+<div class="sc-full-row" data-tier="weak"><span class="sc-name">Metadata Freshness</span><div class="sc-bar-wrap"><div class="sc-bar-fill fo" style="width:38%"></div></div><span class="sc-score s-o">38</span><span class="sc-badge weak">Weak</span><span class="sc-desc">No sitemap.xml found, critical for AI crawler discovery</span></div>
+<div class="sc-full-row" data-tier="weak"><span class="sc-name">Content Structure</span><div class="sc-bar-wrap"><div class="sc-bar-fill fo" style="width:50%"></div></div><span class="sc-score s-o">50</span><span class="sc-badge weak">Weak</span><span class="sc-desc">Lacks explicit Key Takeaways or answer-first paragraphs</span></div>
+<div class="sc-full-row" data-tier="fair"><span class="sc-name">Entity Definitions</span><div class="sc-bar-wrap"><div class="sc-bar-fill fg" style="width:55%"></div></div><span class="sc-score s-g">55</span><span class="sc-badge fair">Fair</span><span class="sc-desc">Blog posts contain definitions but not structured as definitions</span></div>
+<div class="sc-full-row" data-tier="fair"><span class="sc-name">Internal Linking</span><div class="sc-bar-wrap"><div class="sc-bar-fill fg" style="width:55%"></div></div><span class="sc-score s-g">55</span><span class="sc-badge fair">Fair</span><span class="sc-desc">Internal links present but lack descriptive anchor text</span></div>
+<div class="sc-full-row" data-tier="fair"><span class="sc-name">Offering Clarity</span><div class="sc-bar-wrap"><div class="sc-bar-fill fg" style="width:58%"></div></div><span class="sc-score s-g">58</span><span class="sc-badge fair">Fair</span><span class="sc-desc">Health checkup packages and vaccinations listed on mahi sub-domain</span></div>
+<div class="sc-full-row" data-tier="fair"><span class="sc-name">Contact &amp; Trust</span><div class="sc-bar-wrap"><div class="sc-bar-fill fg" style="width:60%"></div></div><span class="sc-score s-g">60</span><span class="sc-badge fair">Fair</span><span class="sc-desc">Phone numbers listed, NABL/NABH/ISO certifications mentioned</span></div>
+<div class="sc-full-row" data-tier="fair"><span class="sc-name">CTA Structure</span><div class="sc-bar-wrap"><div class="sc-bar-fill fg" style="width:62%"></div></div><span class="sc-score s-g">62</span><span class="sc-badge fair">Fair</span><span class="sc-desc">Clear CTAs like Book Appointment and Subscribe present</span></div>
+<div class="sc-full-row" data-tier="fair"><span class="sc-name">FAQ Coverage</span><div class="sc-bar-wrap"><div class="sc-bar-fill fg" style="width:65%"></div></div><span class="sc-score s-g">65</span><span class="sc-badge fair">Fair</span><span class="sc-desc">FAQ sections with user-query phrasing on several blog pages</span></div>
+<div class="sc-full-row" data-tier="fair"><span class="sc-name">Licensing Signals</span><div class="sc-bar-wrap"><div class="sc-bar-fill fg" style="width:65%"></div></div><span class="sc-score s-g">65</span><span class="sc-badge fair">Fair</span><span class="sc-desc">llms.txt and UCP endpoint missing, business.json present</span></div>
+<div class="sc-full-row" data-tier="fair"><span class="sc-name">Structured Data</span><div class="sc-bar-wrap"><div class="sc-bar-fill fg" style="width:70%"></div></div><span class="sc-score s-g">70</span><span class="sc-badge fair">Fair</span><span class="sc-desc">No structured data on live pages, FlowBlinq can generate it</span></div>
+</div>
+</div>
+</div><div class="view" id="view-recs" style="display: none;">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+<div class="pt" style="margin-bottom:0">10 Recommendations — sorted by priority</div>
+<div style="font-size:12px;color:var(--t2)">3 HIGH · 5 MED · 2 LOW</div>
+</div>
+
+<div class="rec-card"><div class="rec-header" onclick="this.nextElementSibling.classList.toggle('open')">
+<div class="rc" onclick="event.stopPropagation();this.classList.toggle('done')"></div><span class="rr">1</span><span class="rip hi">HIGH</span><span class="rn">Author Authority</span><span class="rt">1–2 hrs</span><span style="font-size:11px;color:var(--t3)">↓</span>
+</div><div class="rec-body">
+Blog posts are attributed to ‘Department of [Specialty]’ rather than named authors or medical reviewers. There is no evidence of dedicated credential pages, Person schema, or a published editorial policy.
+<div class="rec-action"><strong>Action:</strong> Assign named authors and expert medical reviewers to all content. Create detailed author/reviewer profile pages with Person schema linking to professional profiles (e.g., LinkedIn). Publish a clear editorial policy.</div>
+<div class="rec-boost">Boost: +Improved E-E-A-T trust signals</div>
+</div></div>
+
+<div class="rec-card"><div class="rec-header" onclick="this.nextElementSibling.classList.toggle('open')">
+<div class="rc" onclick="event.stopPropagation();this.classList.toggle('done')"></div><span class="rr">2</span><span class="rip hi">HIGH</span><span class="rn">Content Freshness</span><span class="rt">30 min</span><span style="font-size:11px;color:var(--t3)">↓</span>
+</div><div class="rec-body">
+A significant portion of blog content dates back to late 2019. While some newer content exists, many articles lack visible “Last Updated” dates, making it impossible for AI to assess recency.
+<div class="rec-action"><strong>Action:</strong> Prioritize updating older content with fresh information and a visible “Last Updated” date. Add dateModified to schema markup. Focus on high-traffic blog posts first.</div>
+<div class="rec-boost">Boost: +Content freshness signals</div>
+</div></div>
+
+<div class="rec-card"><div class="rec-header" onclick="this.nextElementSibling.classList.toggle('open')">
+<div class="rc" onclick="event.stopPropagation();this.classList.toggle('done')"></div><span class="rr">3</span><span class="rip me">MED</span><span class="rn">Evidence &amp; Statistics</span><span class="rt">30 min</span><span style="font-size:11px;color:var(--t3)">↓</span>
+</div><div class="rec-body">
+Some statistics are present in the content, but they are often outdated (e.g., 2019 data). Citations lack hyperlinks to primary sources, reducing verifiability.
+<div class="rec-action"><strong>Action:</strong> Update all statistics with current, verifiable data (within the last 2 years). Add hyperlinks to primary sources (e.g., WHO, ICMR, peer-reviewed journals). Include publication dates for all cited data.</div>
+<div class="rec-boost">Boost: +Verifiable citations</div>
+</div></div>
+
+<div class="rec-card"><div class="rec-header" onclick="this.nextElementSibling.classList.toggle('open')">
+<div class="rc" onclick="event.stopPropagation();this.classList.toggle('done')"></div><span class="rr">4</span><span class="rip hi">HIGH</span><span class="rn">Semantic HTML</span><span class="rt">30 min</span><span style="font-size:11px;color:var(--t3)">↓</span>
+</div><div class="rec-body">
+Multiple H1 tags are present on several pages, and heading levels are frequently skipped. This breaks the document outline that AI crawlers rely on for content understanding.
+<div class="rec-action"><strong>Action:</strong> Ensure each page has a single, unique H1 tag that accurately reflects the page topic. Fix heading hierarchy (H1 → H2 → H3, no skipping). Use semantic elements like &lt;article&gt;, &lt;section&gt;, &lt;aside&gt;.</div>
+<div class="rec-boost">Boost: +Structural clarity for AI parsing</div>
+</div></div>
+
+<div class="rec-card"><div class="rec-header" onclick="this.nextElementSibling.classList.toggle('open')">
+<div class="rc" onclick="event.stopPropagation();this.classList.toggle('done')"></div><span class="rr">5</span><span class="rip lo">LOW</span><span class="rn">Competitive Positioning</span><span class="rt">1–2 hrs</span><span style="font-size:11px;color:var(--t3)">↓</span>
+</div><div class="rec-body">
+No dedicated /compare/ or /vs/ subdirectories found. No per-competitor pages or feature comparison tables exist on the site.
+<div class="rec-action"><strong>Action:</strong> Develop a competitive positioning strategy by creating dedicated comparison pages (e.g., /vs/apollo-hospitals/). Include feature comparison tables, differentiators, and unique value propositions.</div>
+<div class="rec-boost">Boost: +Competitive differentiation in AI responses</div>
+</div></div>
+
+<div class="rec-card"><div class="rec-header" onclick="this.nextElementSibling.classList.toggle('open')">
+<div class="rc" onclick="event.stopPropagation();this.classList.toggle('done')"></div><span class="rr">6</span><span class="rip me">MED</span><span class="rn">Multi-Format Content</span><span class="rt">1–2 hrs</span><span style="font-size:11px;color:var(--t3)">↓</span>
+</div><div class="rec-body">
+Content is primarily text with some images. Video content is present on doctor profile pages but lacks on-page transcripts or text summaries.
+<div class="rec-action"><strong>Action:</strong> For video content, provide on-page transcripts to enhance accessibility and AI parsing. Add infographics, downloadable guides, and structured Q&amp;A formats to key pages.</div>
+<div class="rec-boost">Boost: +Multi-modal AI discovery</div>
+</div></div>
+
+<div class="rec-card"><div class="rec-header" onclick="this.nextElementSibling.classList.toggle('open')">
+<div class="rc" onclick="event.stopPropagation();this.classList.toggle('done')"></div><span class="rr">7</span><span class="rip lo">LOW</span><span class="rn">Metadata Freshness</span><span class="rt">30 min</span><span style="font-size:11px;color:var(--t3)">↓</span>
+</div><div class="rec-body">
+No sitemap.xml was found, which is critical for AI crawler discovery. Many blog pages lack meta descriptions or have generic ones.
+<div class="rec-action"><strong>Action:</strong> Generate and publish a sitemap.xml at manipalhospitals.com/sitemap.xml. Ensure all pages have unique, descriptive meta titles and descriptions. Add lastmod dates to the sitemap.</div>
+<div class="rec-boost">Boost: +AI crawler discoverability</div>
+</div></div>
+
+<div class="rec-card"><div class="rec-header" onclick="this.nextElementSibling.classList.toggle('open')">
+<div class="rc" onclick="event.stopPropagation();this.classList.toggle('done')"></div><span class="rr">8</span><span class="rip me">MED</span><span class="rn">Content Structure</span><span class="rt">30 min</span><span style="font-size:11px;color:var(--t3)">↓</span>
+</div><div class="rec-body">
+Content is generally organized with headings, but lacks explicit “Key Takeaways” sections, answer-first paragraphs, or TL;DR summaries that AI models prefer for extraction.
+<div class="rec-action"><strong>Action:</strong> Implement an answer-first paragraph (200–500 words) for key queries. Add “Key Takeaways” boxes at the top of long-form content. Structure content as direct answers to anticipated user questions.</div>
+<div class="rec-boost">Boost: +Answer extraction by AI</div>
+</div></div>
+
+<div class="rec-card"><div class="rec-header" onclick="this.nextElementSibling.classList.toggle('open')">
+<div class="rc" onclick="event.stopPropagation();this.classList.toggle('done')"></div><span class="rr">9</span><span class="rip me">MED</span><span class="rn">Contact &amp; Trust</span><span class="rt">1–2 hrs</span><span style="font-size:11px;color:var(--t3)">↓</span>
+</div><div class="rec-body">
+Multiple phone numbers are listed. Certifications (NABL, NABH, ISO) are mentioned on some pages but inconsistently. Physical HQ address not consistently displayed.
+<div class="rec-action"><strong>Action:</strong> Consistently display the physical HQ address in the footer across all pages. Add a dedicated “About Us” or “Trust” page consolidating all certifications, awards, and accreditations with verification links.</div>
+<div class="rec-boost">Boost: +Trust signals for AI citation</div>
+</div></div>
+
+<div class="rec-card"><div class="rec-header" onclick="this.nextElementSibling.classList.toggle('open')">
+<div class="rc" onclick="event.stopPropagation();this.classList.toggle('done')"></div><span class="rr">10</span><span class="rip me">MED</span><span class="rn">Internal Linking</span><span class="rt">30 min</span><span style="font-size:11px;color:var(--t3)">↓</span>
+</div><div class="rec-body">
+Internal links are present within content and in “Similar Blogs” / “Recent Posts” sections, but the number per article is low and anchor text is often generic.
+<div class="rec-action"><strong>Action:</strong> Increase the number of contextual internal links (6–15 per article) using descriptive anchor text. Link related conditions, treatments, and doctor profiles to create topical clusters.</div>
+<div class="rec-boost">Boost: +Topical authority signals</div>
+</div></div>
+</div><div class="view" id="view-pages" style="display: none;">
+<div class="pn">
+<div class="pg-controls">
+<div style="display:flex;align-items:center;gap:12px">
+<div class="pg-filters">
+<span class="pg-filter act" style="border-color: rgb(194, 101, 42);">All</span>
+<span class="pg-filter">Good</span>
+<span class="pg-filter">Needs Work</span>
+<span class="pg-filter">Poor</span>
+</div>
+<span class="pg-count">97 pages total · showing page 1 of 5</span>
+</div>
+<input class="pg-search" type="text" placeholder="Search pages...">
+</div>
+<table class="pg-table">
+<thead><tr>
+<th style="width:60%">Page Path ↑</th>
+<th style="text-align:center;width:20%">Fixes</th>
+<th style="text-align:center;width:20%">Status</th>
+</tr></thead>
+<tbody><tr><td class="url" title="virtualcare.manipalhospitals.com/#!/signin" style="">virtualcare:/#!/signin</td><td style="text-align:center"><span class="fixes">4 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="homehealth.manipalhospitals.com/" style="">homehealth:/</td><td style="text-align:center"><span class="fixes">4 fixes</span></td><td style="text-align:center"><span class="status poor">poor</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/what-you-should-know-about-aids/" style="">/blog/what-you-should-know-about-aids/</td><td style="text-align:center"><span class="fixes">5 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/an-overview-about-asthma-and-allergy/" style="">/blog/an-overview-about-asthma-and-allergy/</td><td style="text-align:center"><span class="fixes">5 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/9-common-myths-about-heart-disease/" style="">/blog/9-common-myths-about-heart-disease/</td><td style="text-align:center"><span class="fixes">4 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/all-you-need-to-know-about-leprosy/" style="">/blog/all-you-need-to-know-about-leprosy/</td><td style="text-align:center"><span class="fixes">4 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/all-you-need-to-know-about-scoliosis/" style="">/blog/all-you-need-to-know-about-scoliosis/</td><td style="text-align:center"><span class="fixes">4 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/everything-you-need-to-know-about-hiv/" style="">/blog/everything-you-need-to-know-about-hiv/</td><td style="text-align:center"><span class="fixes">5 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/11-interesting-facts-about-child-surgery/" style="">/blog/11-interesting-facts-about-child-surgery/</td><td style="text-align:center"><span class="fixes">4 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/all-you-need-to-know-about-cervical-cancer/" style="">/blog/all-you-need-to-know-about-cervical-cancer/</td><td style="text-align:center"><span class="fixes">4 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/all-you-need-to-know-about-chemotherapy/" style="">/blog/all-you-need-to-know-about-chemotherapy/</td><td style="text-align:center"><span class="fixes">4 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/everything-you-need-to-know-about-cancer/" style="">/blog/everything-you-need-to-know-about-cancer/</td><td style="text-align:center"><span class="fixes">4 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/an-overview-about-knee-and-hip-arthritis/" style="">/blog/an-overview-about-knee-and-hip-arthritis/</td><td style="text-align:center"><span class="fixes">4 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/11-common-myths-about-ear-cosmetic-surgery/" style="">/blog/11-common-myths-about-ear-cosmetic-surgery/</td><td style="text-align:center"><span class="fixes">5 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/7-interesting-facts-about-organ-transplants/" style="">/blog/7-interesting-facts-about-organ-transplants/</td><td style="text-align:center"><span class="fixes">3 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/everything-you-must-know-about-neonatology/" style="">/blog/everything-you-must-know-about-neonatology/</td><td style="text-align:center"><span class="fixes">3 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/some-myths-about-diet-foods-and-weight-loss/" style="">/blog/some-myths-about-diet-foods-and-weight-loss/</td><td style="text-align:center"><span class="fixes">3 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/6-things-you-need-to-know-about-the-flu-season/" style="">/blog/6-things-you-need-to-know-about-the-flu-season/</td><td style="text-align:center"><span class="fixes">3 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/myths-and-facts-about-kidney-transplantation-2/" style="">/blog/myths-and-facts-about-kidney-transplantation-2/</td><td style="text-align:center"><span class="fixes">3 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr><tr><td class="url" title="www.manipalhospitals.com/blog/everything-you-need-to-know-about-breast-cancer/" style="">/blog/everything-you-need-to-know-about-breast-cancer/</td><td style="text-align:center"><span class="fixes">3 fixes</span></td><td style="text-align:center"><span class="status nw">needs work</span></td></tr></tbody>
+</table>
+<div class="pg-pag">
+<button class="btn" disabled="">← Prev</button>
+<span>Page 1 of 5</span>
+<button class="btn">Next →</button>
+</div>
+</div>
+</div><div class="view" id="view-history" style="display: none;">
+<div class="pn">
+<div class="pt">Score History</div>
+<div class="hist-row" style="border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:4px">
+<span style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;width:140px">Date</span>
+<span style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;width:50px;text-align:center">Score</span>
+<span style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;width:60px;text-align:center">Change</span>
+<span style="flex:1"></span>
+</div>
+<div class="hist-row">
+<span class="hist-date">Mar 23, 2026</span>
+<span class="hist-score" style="color:var(--red)">45</span>
+<span class="hist-delta flat">—</span>
+<div class="hist-bar"><div class="hist-fill" style="width:45%;background:var(--red);border-radius:3px"></div></div>
+</div>
+<div style="text-align:center;padding:40px 0">
+<div style="margin-bottom:12px">
+<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+</div>
+<div style="font-size:14px;font-weight:600;color:var(--t2);margin-bottom:4px">Your score trend will appear here</div>
+<div style="font-size:12px;color:var(--t3);max-width:340px;margin:0 auto">Run additional scans to track progress over time. Each scan adds a data point showing how your AI visibility evolves as you implement recommendations.</div>
+<button class="btn" style="margin-top:16px">Refresh Score (4/4 remaining)</button>
+</div>
+</div>
+</div><div class="view active" id="view-setup" style="display: none;">
+<div class="setup-section">
+<h3>Your AI Files</h3>
+<div class="setup-status"><span class="dot"></span> All files generated and live</div>
+<div style="font-size:13px;color:var(--t2);margin-bottom:16px">Your AI context document, business profile, and structured data are ready. Connect your domain below to serve them from your own URLs.</div>
+<div class="setup-files">
+<div class="setup-file"><div class="sf-name" style="color: rgb(194, 101, 42);">AI context</div><div class="sf-path">Served at /llms.txt</div></div>
+<div class="setup-file"><div class="sf-name" style="color: rgb(194, 101, 42);">Extended context</div><div class="sf-path">Served at /llms-full.txt</div></div>
+<div class="setup-file"><div class="sf-name" style="color: rgb(194, 101, 42);">Business profile</div><div class="sf-path">Served at /.well-known/ucp.json</div></div>
+<div class="setup-file"><div class="sf-name" style="color: rgb(194, 101, 42);">Structured data</div><div class="sf-path">42 block(s) · /geo-schema.json</div></div>
+<div class="setup-file"><div class="sf-name" style="color: rgb(194, 101, 42);">URL manifest</div><div class="sf-path">All 4 files · /urls.txt</div></div>
+</div>
+</div>
+
+<div class="setup-section">
+<h3>Domain Integration</h3>
+<div class="pn">
+<div class="pt">Step 1 — Verify Domain Ownership</div>
+<div class="setup-steps">
+<div class="setup-step">Log into your DNS provider (Cloudflare, Route53, GoDaddy, etc.)</div>
+<div class="setup-step">Add a TXT record — Host: <code>@</code> or <code>_flowblinq-verify</code> — with the value shown below</div>
+<div class="setup-step">DNS changes can take up to 24 hours to propagate</div>
+<div class="setup-step">Click the verify button once you have added the record</div>
+</div>
+<div style="margin-top:16px">
+<div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px">TXT record value:</div>
+<div class="setup-code">
+<code style="color:var(--green);font-weight:600">flowblinq-verify-s8nbVx-w_XAf9Hzni_FBU</code>
+<button class="copy-btn" onclick="navigator.clipboard.writeText('flowblinq-verify-s8nbVx-w_XAf9Hzni_FBU');this.textContent='Copied!';setTimeout(()=&gt;this.textContent='Copy',1500)" style="border-color: rgb(194, 101, 42); color: rgb(194, 101, 42);">Copy</button>
+</div>
+</div>
+<button class="verify-btn">Verify Domain Ownership</button>
+<div class="note">Once verified, your AI files will be served from manipalhospitals.com directly.</div>
+</div>
+</div>
+</div></div></div><div class="mb">MOCKUP — Proposed Dashboard Redesign</div><div id="claude-static-indicator-container" style="position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); align-items: center; justify-content: center; padding: 6px 6px 6px 16px; background: rgb(250, 249, 245); border: 0.5px solid rgba(31, 30, 29, 0.3); border-radius: 14px; box-shadow: rgba(0, 0, 0, 0.15) 0px 40px 80px 0px; z-index: 2147483647; pointer-events: none; white-space: nowrap; user-select: none; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif;">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; flex-shrink: 0; margin-right: 8px;">
+        <path d="M3.13946 10.6399L6.28757 8.87462L6.37405 8.73821L6.28757 8.6339H6.13189L5.60432 8.6018L3.80541 8.55366L2.24865 8.48947L0.735135 8.40923H0.492973L0.354595 8.32899L0.181622 8.1685L0.0345946 8.01605L0 7.85557L0.0345946 7.62287L0.138378 7.44634L0.224865 7.40622H0.354595L0.812973 7.44634L1.82486 7.51856L3.34703 7.62287L4.44541 7.68706L6.08 7.85557H6.33946L6.37405 7.75125L6.28757 7.68706L6.21838 7.62287L4.64432 6.55567L2.94054 5.4323L2.04973 4.78235L1.57405 4.45336L1.33189 4.14845L1.22811 3.92377L1.17622 3.69107L1.22811 3.47442L1.33189 3.28185L1.46162 3.13741L1.66054 2.99298H1.87676L2.24865 3.0331L2.39568 3.07322L2.99243 3.53059L4.26378 4.51755L5.92432 5.73721L6.16649 5.93781H6.27892V5.82548L6.16649 5.64092L5.26703 4.01204L4.30703 2.35105L3.87459 1.66098L3.76216 1.25176C3.7391 1.16082 3.69297 0.977332 3.69297 0.970913V0.762287L3.77946 0.505517L3.93513 0.240722L4.18595 0.0882648L4.4627 0H4.67892L4.83459 0.0240722L5.12865 0.0882648L5.4054 0.328987L5.82054 1.27583L6.48649 2.76028L7.52432 4.78235L7.82703 5.38415L7.99135 5.93781L8.05189 6.10632H8.15567V6.01003L8.24216 4.87061L8.39784 3.47442L8.55351 1.67703L8.6054 1.17151L8.85622 0.561685L8.9773 0.417252L9.21946 0.232698H9.35784L9.74703 0.417252L9.97189 0.665998L10.067 0.874624L10.0238 1.17151L9.83351 2.40722L9.46162 4.34102L9.21946 5.64092H9.35784L9.52216 5.47242L10.1795 4.60582L11.2778 3.22568L11.7622 2.68004L12.333 2.07823L12.6962 1.78937L13.0162 1.67703L13.3881 1.78937L13.7168 2.06219L13.8897 2.54363V2.76028L13.6649 3.32197L12.9557 4.22066L12.3676 4.98295L12.0043 5.56871L11.0011 7.02106V7.08526H11.1741L13.0768 6.67603L14.1059 6.49147L15.3341 6.28285L15.5762 6.34704L15.8876 6.53962L15.9481 6.80441L15.8876 7.12538L15.7319 7.34203L14.4173 7.66299L12.8778 7.97593L10.5854 8.51559C10.5705 8.51909 10.56 8.53236 10.56 8.54764C10.56 8.56468 10.573 8.57891 10.59 8.58044L11.6238 8.67402L12.0649 8.69809H13.1459L15.1611 8.85055L15.6886 9.19559L15.9481 9.39619L16 9.62086L15.9481 9.94985L15.8443 10.1023L15.4119 10.3029L15.1351 10.3591L14.0454 10.1023L11.4941 9.49248L10.6205 9.27583H10.4995V9.34804L11.2259 10.0622L12.5665 11.2658L14.2357 12.8225L14.3222 13.0953V13.2076L14.1059 13.5125L13.9243 13.5206L13.8811 13.4804L12.4108 12.3731L12.2984 12.325L11.84 11.8756L10.56 10.7924H10.4735V10.9047L10.7676 11.338L12.333 13.6891L12.4108 14.4112L12.2984 14.6439L11.8919 14.7884L11.667 14.7563L11.4508 14.7081L11.2605 14.5396L10.5254 13.4162L9.5827 11.9719L8.82162 10.672H8.79342C8.76039 10.672 8.73278 10.6972 8.7297 10.73L8.27676 15.5667L8.06919 15.8154L7.6454 16H7.58486L7.17838 15.6951L6.96216 15.1976L7.17838 14.2106L7.43784 12.9268L7.6454 11.9077L7.83567 10.6399L7.95187 10.2164C7.9548 10.2057 7.95069 10.1944 7.94161 10.1881C7.91157 10.1672 7.87034 10.1741 7.84878 10.2037L6.89297 11.5145L5.44 13.4804L4.28973 14.7081L4.01297 14.8205H3.80541L3.5373 14.5717V14.4514L3.58054 14.1304L3.84865 13.7372L5.44 11.7151L6.4 10.4554L7.01872 9.73222C7.04511 9.70139 7.04245 9.65523 7.0127 9.62763C7.00333 9.61894 6.98925 9.61773 6.97854 9.62471L2.75027 12.3811L1.99784 12.4774L1.66919 12.1725L1.71243 11.675L1.86811 11.5145L3.13946 10.6399Z" fill="#D97757"></path>
+      </svg>
+      <span style="vertical-align: middle; color: #141413; font-size: 14px; display: inline-block;">Claude is active in this tab group</span>
+      <div style="display: inline-block; width: 0.5px; height: 32px; background: rgba(31, 30, 29, 0.15); margin: 0 8px; vertical-align: middle;"></div>
+      <button id="claude-static-chat-button" style="position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 6px; background: transparent; border: none; cursor: pointer; pointer-events: auto; vertical-align: middle; width: 32px; height: 32px; border-radius: 8px; transition: background 0.2s;">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="#141413" xmlns="http://www.w3.org/2000/svg" style="width: 20px; height: 20px; display: block;">
+          <path d="M10 2.5C14.1421 2.5 17.5 5.85786 17.5 10C17.5 14.1421 14.1421 17.5 10 17.5H3C2.79779 17.5 2.61549 17.3782 2.53809 17.1914C2.4607 17.0046 2.50349 16.7895 2.64648 16.6465L4.35547 14.9365C3.20124 13.6175 2.5 11.8906 2.5 10C2.5 5.85786 5.85786 2.5 10 2.5ZM10 3.5C6.41015 3.5 3.5 6.41015 3.5 10C3.5 11.7952 4.22659 13.4199 5.40332 14.5967L5.46582 14.6729C5.52017 14.7544 5.5498 14.8508 5.5498 14.9502C5.5498 15.0828 5.49709 15.2099 5.40332 15.3037L4.20703 16.5H10C13.5899 16.5 16.5 13.5899 16.5 10C16.5 6.41015 13.5899 3.5 10 3.5ZM13.29 9.30371C13.3986 9.05001 13.6925 8.93174 13.9463 9.04004C14.2 9.14863 14.3183 9.44253 14.21 9.69629C13.8506 10.536 13.1645 11.25 12.25 11.25C11.6372 11.25 11.128 10.9289 10.75 10.4648C10.372 10.9289 9.86276 11.25 9.25 11.25C8.63724 11.25 8.12801 10.9289 7.75 10.4648C7.37198 10.9289 6.86276 11.25 6.25 11.25C5.97386 11.25 5.75 11.0261 5.75 10.75C5.75 10.4739 5.97386 10.25 6.25 10.25C6.58764 10.25 7.00448 9.97056 7.29004 9.30371L7.32422 9.2373C7.41431 9.09121 7.5749 9 7.75 9C7.9501 9 8.13123 9.11975 8.20996 9.30371L8.32227 9.53516C8.59804 10.0359 8.95442 10.25 9.25 10.25C9.58764 10.25 10.0045 9.97056 10.29 9.30371L10.3242 9.2373C10.4143 9.09121 10.5749 9 10.75 9C10.9501 9 11.1312 9.11975 11.21 9.30371L11.3223 9.53516C11.598 10.0359 11.9544 10.25 12.25 10.25C12.5876 10.25 13.0045 9.97056 13.29 9.30371Z"></path>
+        </svg>
+        <span id="claude-static-chat-tooltip" style="position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%); padding: 6px 12px; background: #30302E; color: #FAF9F5; border-radius: 6px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">Open chat</span>
+      </button>
+      <button id="claude-static-close-button" style="position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 6px; background: transparent; border: none; cursor: pointer; pointer-events: auto; vertical-align: middle; width: 32px; height: 32px; margin-left: 4px; border-radius: 8px; transition: background 0.2s;">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 20px; height: 20px; display: block;">
+          <path d="M15.1464 4.14642C15.3417 3.95121 15.6582 3.95118 15.8534 4.14642C16.0486 4.34168 16.0486 4.65822 15.8534 4.85346L10.7069 9.99997L15.8534 15.1465C16.0486 15.3417 16.0486 15.6583 15.8534 15.8535C15.6826 16.0244 15.4186 16.0461 15.2245 15.918L15.1464 15.8535L9.99989 10.707L4.85338 15.8535C4.65813 16.0486 4.34155 16.0486 4.14634 15.8535C3.95115 15.6583 3.95129 15.3418 4.14634 15.1465L9.29286 9.99997L4.14634 4.85346C3.95129 4.65818 3.95115 4.34162 4.14634 4.14642C4.34154 3.95128 4.65812 3.95138 4.85338 4.14642L9.99989 9.29294L15.1464 4.14642Z" fill="#141413"></path>
+        </svg>
+        <span id="claude-static-close-tooltip" style="position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%); padding: 6px 12px; background: #30302E; color: #FAF9F5; border-radius: 6px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">Dismiss</span>
+      </button>
+    </div></body></html>

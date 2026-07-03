@@ -1,0 +1,1245 @@
+% !TEX program = pdflatex
+%
+% citation-check-cost-audit.tex
+%
+% Full-fidelity transcript + analysis of the Citation Check cost audit
+% conducted 2026-04-07 between Aditya Nittur (CEO/CoFounder, Flowblinq) and
+% the CoFounder agent. Captures the file-level audit of
+% geo/lib/services/citation-checker.ts, the provider pricing reverification,
+% the architectural alternatives (external search, preemptive injection,
+% prompt caching, MCP), and the final pricing decision.
+%
+% Output: geo/docs/citation-check-cost-audit.pdf
+% Compile: pdflatex citation-check-cost-audit.tex  (run twice for ToC)
+
+\documentclass[11pt,letterpaper]{article}
+
+\usepackage[margin=0.9in]{geometry}
+\usepackage{parskip}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{framed}
+\usepackage{titling}
+\usepackage{sectsty}
+
+\definecolor{brand}{HTML}{1F3A5F}
+\definecolor{accent}{HTML}{B8733A}
+\definecolor{codebg}{HTML}{F5F5F5}
+\definecolor{codeborder}{HTML}{DDDDDD}
+\definecolor{quoteblue}{HTML}{EEF2F8}
+\definecolor{warn}{HTML}{C0392B}
+\definecolor{good}{HTML}{1E8449}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=brand,
+  urlcolor=brand,
+  citecolor=brand,
+  pdftitle={Citation Check Cost Audit},
+  pdfauthor={CoFounder agent for Aditya Nittur},
+}
+
+\sectionfont{\color{brand}}
+\subsectionfont{\color{brand}}
+\subsubsectionfont{\color{brand}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\color{brand}\small Citation Check Cost Audit}
+\fancyhead[R]{\color{brand}\small 2026-04-07}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\lstdefinestyle{code}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  frame=single,
+  rulecolor=\color{codeborder},
+  breaklines=true,
+  showstringspaces=false,
+  captionpos=b,
+}
+\lstset{style=code}
+
+\newenvironment{userturn}
+  {\begin{quote}\small\color{brand}\textbf{Aditya:}~}
+  {\end{quote}}
+
+\newenvironment{cofounderturn}
+  {\par\vspace{0.2em}\noindent\textbf{CoFounder:}\par}
+  {\par\vspace{0.4em}}
+
+\newcommand{\good}[1]{\textcolor{good}{#1}}
+\newcommand{\warn}[1]{\textcolor{warn}{#1}}
+\newcommand{\costneg}[1]{\textcolor{warn}{#1}}
+\newcommand{\costpos}[1]{\textcolor{good}{#1}}
+
+\title{\color{brand}\Huge Citation Check Cost Audit\\[0.4em]
+  \Large \texttt{geo/lib/services/citation-checker.ts}}
+\author{CoFounder agent\\for Aditya Nittur\\Flowblinq}
+\date{2026-04-07}
+
+\begin{document}
+
+\maketitle
+
+\begin{center}
+\begin{minipage}{0.85\textwidth}
+\small
+\noindent\textbf{Abstract.} This document captures, in full fidelity, the
+cost audit conversation conducted on 2026-04-07 between Aditya Nittur and the
+CoFounder agent. The audit began as a deep-dive into the cost of running the
+\texttt{citation-checker.ts} service in response to a user clicking the
+``Run Citation Check'' button in the GEO product UI. It expanded into a
+reverification of live LLM provider pricing, an analysis of architectural
+alternatives (external search, preemptive tool injection, prompt caching,
+Model Context Protocol), and culminated in a pricing decision at fixed base
+subscriptions with metered overage priced at 1.5$\times$ variable cost.
+
+\noindent The document is intended as (1) a decision record for the
+architectural and pricing choices made, (2) the source material for the
+follow-up technical specifications (TS-077 architecture, TS-078 Stripe
+metered billing), and (3) evidence for investor or partner conversations
+about Flowblinq's unit economics on the citation check feature.
+\end{minipage}
+\end{center}
+
+\vspace{1em}
+
+\tableofcontents
+
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Context and opening prompt}
+
+The session opened with the CoFounder agent picking up a crashed pipeline:
+no agents were active except HolePoker (which had just restarted), and the
+stale \texttt{ACTIVATE-1.yaml} signal was from a completed ES-075 run. The
+last real activity was the TS-076 taskboarding on 2026-04-04.
+
+Aditya's opening:
+
+\begin{userturn}
+Do a deep-dive audit of all costs when running citation-checker.ts --- all
+of the costs.
+\end{userturn}
+
+The CoFounder clarified the interpretation: the file
+\texttt{geo/lib/services/citation-checker.ts} is the service layer that runs
+when a user clicks ``Run Citation Check'' in the product, and ``all of the
+costs'' was interpreted to mean (a) direct LLM API spend, (b) third-party
+search/tool fees, (c) infrastructure costs (Vercel, database, queue), and
+(d) credit charges levied against the customer.
+
+\section{What the file actually does}
+
+\subsection{Cost-bearing surface}
+
+\texttt{citation-checker.ts} exports one cost-bearing function
+(\texttt{runCitationCheck}) and several pure aggregators
+(\texttt{aggregateByDimension}, \texttt{aggregateCompetitorsByDimension},
+\texttt{computeImpressionShare}, \texttt{generateTierInsight},
+\texttt{generateDominanceInsights}). Only \texttt{runCitationCheck} makes
+paid external calls.
+
+Inside \texttt{runCitationCheck}, the entire external-cost surface is
+\textbf{four helper functions}, one per provider:
+
+\begin{center}
+\begin{tabular}{@{}llllll@{}}
+\toprule
+\textbf{Helper} & \textbf{File line} & \textbf{Provider} & \textbf{Model} & \textbf{Tool} & \textbf{Output cap} \\
+\midrule
+\texttt{queryOpenAI}     & 85--110  & OpenAI    & gpt-5.4-mini               & web\_search          & 256 tok \\
+\texttt{queryAnthropic}  & 112--130 & Anthropic & claude-haiku-4-5-20251001  & web\_search\_20250305 & 256 tok \\
+\texttt{queryPerplexity} & 132--150 & Perplexity (via OpenAI shim) & sonar    & built-in retrieval   & 256 tok \\
+\texttt{queryGoogle}     & 152--166 & Gemini    & gemini-2.5-flash           & googleSearch         & unset \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The file itself does \textbf{zero} database writes, \textbf{zero} Redis
+operations, \textbf{zero} Blob storage writes, and \textbf{zero} queue or
+CostMaster calls. Everything that costs money is concentrated in those four
+functions.
+
+\subsection{Call volume per invocation}
+
+Volume = prompt count $\times$ provider count.
+
+\textbf{Prompts} are generated upstream by
+\texttt{citation-prompt-generator.ts}. The V2 path uses
+\texttt{buildCoveringArray} with a budget of 36 indirect prompts, plus
+\texttt{buildDirectPromptsV2} which returns 8 direct prompts. Total:
+\textbf{44 prompts per run} in the typical V2 path, with a hard ceiling of
+48 prompts under the legacy path.
+
+\textbf{Providers} are returned by \texttt{getConfiguredProviders}
+(lines 170--181). With all four environment keys set, there are 4
+providers.
+
+Cartesian product: $44 \times 4 = \mathbf{176}$ LLM calls per click of Run
+Citation Check. Ceiling: $48 \times 4 = 192$.
+
+Batching in \texttt{config.ts}: \texttt{CITATION\_CHECK\_BATCH\_SIZE = 20}
+parallel calls, \texttt{CITATION\_CHECK\_BATCH\_DELAY\_MS = 100}. Nine batches
+per run, wall time 50--150 seconds end-to-end.
+
+\subsection{Per-call token and tool fees}
+
+Each call passes approximately:
+
+\begin{itemize}[nosep]
+  \item System prompt \texttt{CITATION\_SYSTEM\_PROMPT} $\approx$ 250 input tokens (shared across providers)
+  \item User prompt (single citation query) $\approx$ 20--40 tokens
+  \item Tool schema (web\_search) $\approx$ 80--150 tokens
+  \item \textbf{Search result injection when the tool fires: $+$1,500--4,000 input tokens per search --- the silent killer}
+  \item Output capped at 256 tokens
+\end{itemize}
+
+Tool-usage caps:
+\begin{itemize}[nosep]
+  \item Anthropic: \texttt{max\_uses: 2} is a hard API-level cap
+  \item OpenAI: \texttt{search\_context\_size: "low"} is a soft hint only; there is no hard cap on search count
+  \item Gemini: grounding is fully provider-managed, no exposed cap
+  \item Perplexity Sonar: search is baked into the model; no cap
+\end{itemize}
+
+\section{Initial cost rollup (conservative list-price math)}
+
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Provider} & \textbf{Calls} & \textbf{Mid \$/call} & \textbf{Mid total} & \textbf{High total} \\
+\midrule
+OpenAI               & 44 & \$0.027 & \$1.19 & \$1.50 \\
+Anthropic            & 44 & \$0.026 & \$1.14 & \$1.40 \\
+Perplexity           & 44 & \$0.007 & \$0.31 & \$0.40 \\
+Gemini (under quota) & 44 & \$0.002 & \$0.09 & \$0.09 \\
+Gemini (over quota)  & 44 & \$0.037 & \$1.63 & \$1.85 \\
+\midrule
+\textbf{Total (Gemini under quota)} & 176 & & \textbf{\$2.73} & \textbf{\$3.39} \\
+\textbf{Total (Gemini over quota)}  & 176 & & \textbf{\$4.27} & \textbf{\$5.15} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{What the customer pays (initial misreading)}
+
+CoFounder initially quoted \$0.24/credit from \texttt{BULK\_CREDIT\_PRICE\_INR}
+and reported customer payment as \$1.20/click (5 credits $\times$ \$0.24).
+This was later corrected by Aditya. The bulk-INR price applies only to the
+bulk CSV audit path, not to the per-action \texttt{shareOfVoice} charge,
+which draws from the fungible subscription credit pool at much lower \$/credit
+rates.
+
+\subsection{Margin finding (before correction)}
+
+Even with the incorrect \$1.20 revenue figure, the conclusion was:
+
+\begin{quote}
+\textbf{Citation Check is loss-making at the per-run unit level on plausible
+assumptions.} The 5-credit price was set when the call surface was much
+smaller; the V2 prompt architecture (44 prompts $\times$ 4 providers
+$+$ web\_search) is materially more expensive than the credit model assumes.
+\end{quote}
+
+\section{Clarification: is an audit being called on this path?}
+
+\begin{userturn}
+Again, I am asking only about the Run Citation Check action from the UI,
+are we calling an audit on that path?
+\end{userturn}
+
+CoFounder traced the UI button to \texttt{handleScanCitations} in
+\texttt{SitePageClient.tsx:335} and \texttt{runCheck} in
+\texttt{citation-monitor.tsx:493}, both of which \texttt{POST} to
+\texttt{/api/sites/[id]/citation-check}. That route:
+
+\begin{itemize}[nosep]
+  \item Requires \texttt{site.geoScorecard} to already exist (line 45--49),
+    returning \texttt{422 geo\_analysis\_required} if not --- so the route
+    \textit{refuses to start} without an audit already present
+  \item Deducts exactly \texttt{ACTION\_CREDITS.shareOfVoice = 5} credits
+  \item Runs lazy one-shot enrichments (\texttt{extractTrees},
+    \texttt{extractCategoriesViaHaiku}, \texttt{extractBrandKeywords}) that
+    operate on already-crawled data and do not re-crawl or re-run the audit
+\end{itemize}
+
+\textbf{Conclusion:} clicking Run Citation Check does \textbf{not} trigger a
+GEO audit. The two buttons are separate. The previous section's ``adjacent
+cost'' calls all live inside the citation-check route and are part of the
+citation check, not a separate audit double-charge.
+
+\section{Reverification with live provider pricing}
+
+\begin{userturn}
+Check the current pricing and reverify. [Later clarified: ``I meant check
+the GEO pricing and reverify the cost per citation that we are bearing.'']
+\end{userturn}
+
+CoFounder pulled live prices from vendor docs.
+
+\subsection{GEO customer-facing pricing (from \texttt{geo/lib/config.ts})}
+
+\begin{center}
+\begin{tabular}{@{}llr@{}}
+\toprule
+\textbf{Source of credits} & \textbf{Math} & \textbf{\$/credit} \\
+\midrule
+One-off pack           & 100 credits / \$10     & \$0.1000 \\
+Starter subscription   & 1,430 credits / \$99   & \$0.0692 \\
+Growth subscription    & 7,465 credits / \$249  & \$0.0334 \\
+Pro subscription       & 28,915 credits / \$499 & \$0.0173 \\
+Bulk CSV (INR path)    & 1 credit / 20 INR $\approx$ \$0.24 & \$0.2400 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Bulk INR pricing applies only to bulk CSV audits, not citation check.
+Citation check's 5-credit charge yields customer revenue per click of:
+
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Credit source} & \textbf{5 credits cost customer} \\
+\midrule
+Pro         & \$0.087 \\
+Growth      & \$0.167 \\
+Starter     & \$0.346 \\
+One-off pack & \$0.500 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Prior ``\$1.20/click'' figure was 2.4$\times$ to 14$\times$ too high.}
+
+\subsection{LLM unit prices (verified live)}
+
+\begin{center}
+\begin{tabular}{@{}llrr@{}}
+\toprule
+\textbf{Provider / Model} & \textbf{Tool} & \textbf{Input \$/M} & \textbf{Output \$/M} \\
+\midrule
+OpenAI \texttt{gpt-5.4-mini}         & web\_search \$10/1k + 8K search-content at input rate & \$0.75 & \$4.50 \\
+Anthropic \texttt{claude-haiku-4-5}  & web\_search \$10/1k + search results at input rate    & \$1.00 & \$5.00 \\
+Google \texttt{gemini-2.5-flash}     & Grounding free $\le$1,500/day, then \$35/1k            & \$0.30 & \$2.50 \\
+Perplexity \texttt{sonar}            & \$5/1k requests at \texttt{low} context                & \$1.00 & \$1.00 \\
+Anthropic \texttt{claude-sonnet-4-6} (ancillary) & ---                                        & \$3.00 & \$15.00 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Corrected per-call cost (current architecture, in-LLM tools)}
+
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Per-call component} & \textbf{Cost} \\
+\midrule
+OpenAI: (280 + 8,000) input $\times$ \$0.75/M + 256 out $\times$ \$4.50/M + \$0.010 tool fee & \$0.01736 \\
+Anthropic: (280 + 8,000) input $\times$ \$1/M + 256 out $\times$ \$5/M + 2$\times$\$0.010 tool fee & \$0.02956 \\
+Perplexity Sonar: (280 input) \$1/M + 256 out \$1/M + \$0.005 request fee & \$0.00556 \\
+Gemini (under quota): (280 + 3,500) \$0.30/M + 256 out \$2.50/M & \$0.00177 \\
+Gemini (over quota): same + \$0.035 grounding fee & \$0.03677 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Per-run cost (44 prompts $\times$ 4 providers)}
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Configuration} & \textbf{Conservative} & \textbf{Aggressive} \\
+\midrule
+OpenAI (176 $\div$ 4 = 44 calls)    & \$0.764 & \$1.452 \\
+Anthropic (44 calls)                 & \$1.302 & \$1.302 \\
+Perplexity Sonar (44 calls)          & \$0.244 & \$0.332 \\
+Gemini under quota (44 calls)        & \$0.079 & --- \\
+Gemini over quota (44 calls)         & ---      & \$1.620 \\
+\midrule
+\textbf{runCitationCheck total}      & \textbf{\$2.393} & \textbf{\$4.704} \\
+\midrule
+Ancillary calls (warm path)          & \$0.152 & \$0.152 \\
+Ancillary calls (cold path)          & \$0.284 & \$0.284 \\
+\midrule
+\textbf{Per click, warm path}        & \textbf{\$2.55} & \textbf{\$4.86} \\
+\textbf{Per click, cold path}        & \textbf{\$2.68} & \textbf{\$4.99} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Corrected margin table}
+
+\begin{center}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Customer} & \textbf{Pays} & \textbf{Cons. cost} & \textbf{Margin} & \textbf{Aggr. cost} & \textbf{Margin} \\
+\midrule
+Pro     & \$0.087 & \$2.55 & \costneg{-\$2.46} & \$4.86 & \costneg{-\$4.77} \\
+Growth  & \$0.167 & \$2.55 & \costneg{-\$2.38} & \$4.86 & \costneg{-\$4.69} \\
+Starter & \$0.346 & \$2.55 & \costneg{-\$2.20} & \$4.86 & \costneg{-\$4.51} \\
+Pack    & \$0.500 & \$2.55 & \costneg{-\$2.05} & \$4.86 & \costneg{-\$4.36} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Headline:} every tier loses money on every click. Pro is the worst
+because its credits are the cheapest. A Pro customer running Citation Check
+5 times a month across 5 sites loses Flowblinq approximately \$87.50/month in
+LLM spend on that single feature.
+
+\section{Alternative architectures --- stripping web tools}
+
+\begin{userturn}
+Ok. If we don't engage web tools, how much does the citation check range
+change by, in terms of costing?
+\end{userturn}
+
+\subsection{Mechanism}
+
+Remove \texttt{tools: [\{ type: "web\_search", ... \}]} from the OpenAI,
+Anthropic, and Gemini calls. Perplexity Sonar cannot have tools stripped ---
+it is a search-native model with retrieval baked in. Two variants:
+
+\begin{enumerate}[nosep]
+  \item Keep Sonar with its built-in retrieval (4 providers, 176 calls)
+  \item Drop Sonar entirely (3 providers, 132 calls)
+\end{enumerate}
+
+\subsection{Cost with tools off}
+
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Configuration} & \textbf{runCitationCheck} & \textbf{Ancillary} & \textbf{Per click} & \textbf{Reduction} \\
+\midrule
+Current (in-LLM tools, conservative) & \$2.39 & \$0.15 & \$2.55 & --- \\
+Current (in-LLM tools, aggressive)   & \$4.70 & \$0.15 & \$4.86 & --- \\
+Tools off, 4 providers (Sonar kept)  & \$0.41 & \$0.15 & \textbf{\$0.56} & \good{$-$78\% to $-$88\%} \\
+Tools off, 3 providers (Sonar dropped) & \$0.16 & \$0.15 & \textbf{\$0.31} & \good{$-$88\% to $-$94\%} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Cost of stripping tools (non-cash)}
+
+\begin{quote}
+Stripping web tools changes what the citation check \textit{measures}. With
+tools, it measures live discoverability --- what a real user would see when
+the LLM actually searches the web right now. Without tools, it measures
+parametric memory --- what the LLM remembers about the brand from its
+training cutoff. The GEO product is positioned as ``improve your visibility
+in AI search'' --- without tools, the citation check stops measuring
+``AI search'' and starts measuring ``what AI remembers'', which is a
+structural product change.
+\end{quote}
+
+\section{External search APIs as a replacement}
+
+\begin{userturn}
+Alright. Now, if instead of using the in llm tool, I use firecrawl /search,
+then what happens? If I use Brave API, then what happens?
+\end{userturn}
+
+\subsection{Vendor pricing (verified live)}
+
+\begin{center}
+\begin{tabular}{@{}lllr@{}}
+\toprule
+\textbf{Vendor} & \textbf{Plan} & \textbf{Notes} & \textbf{\$/search} \\
+\midrule
+Brave Search    & Standard      & \$5/1k req; \$5/mo free credit $\approx$ 1,000 free queries; 50 QPS & \$0.00500 \\
+Firecrawl \texttt{/search} & Hobby    & \$16/mo / 3,000 credits; 2 credits per search (no scrape) & \$0.01067 \\
+Firecrawl \texttt{/search} & Standard & \$83/mo / 100,000 credits; 2 credits per search           & \$0.00166 \\
+Firecrawl \texttt{/search} & Growth   & \$333/mo / 500,000 credits; 2 credits per search          & \$0.00133 \\
+Firecrawl \texttt{/search} $+$scrape & Standard & 12 credits per search (full scraped content) & \$0.00996 \\
+Firecrawl \texttt{/search} $+$scrape & Growth   & 12 credits per search                         & \$0.00800 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Architectural change}
+
+Currently each of the 4 LLMs invokes its own web\_search tool independently
+($\sim$132--176 total searches per run). The proposed architecture does
+\textbf{one external search per prompt}, shared across all LLMs, and feeds
+results into each LLM call as plain context. LLMs run with no tools.
+
+Per run: \textbf{44 searches} (one per prompt), \textbf{176 LLM calls} (or
+132 if Sonar is dropped, because Sonar's built-in retrieval makes it
+redundant with external search).
+
+\subsection{Total cost per click with external search}
+
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Configuration} & \textbf{Search} & \textbf{LLM} & \textbf{Anc.} & \textbf{Total} \\
+\midrule
+Current in-LLM tools (conservative)                                    & bundled & \$2.39 & \$0.15 & \$2.55 \\
+Current in-LLM tools (aggressive)                                      & bundled & \$4.70 & \$0.15 & \$4.86 \\
+Brave + 3 LLMs, snippets                                               & \$0.22  & \$0.43 & \$0.15 & \textbf{\$0.80} \\
+Brave + 3 LLMs, free \$5 credit ($\le$22 runs/mo)                      & \$0.00  & \$0.43 & \$0.15 & \textbf{\$0.58} \\
+Firecrawl Standard /search + 3 LLMs, snippets                          & \$0.07  & \$0.43 & \$0.15 & \textbf{\$0.66} \\
+Firecrawl Growth /search + 3 LLMs, snippets                            & \$0.06  & \$0.43 & \$0.15 & \textbf{\$0.64} \\
+Firecrawl Standard /search $+$scrape + 3 LLMs                          & \$0.44  & \$0.88 & \$0.15 & \textbf{\$1.47} \\
+Firecrawl Growth /search $+$scrape + 3 LLMs                            & \$0.35  & \$0.88 & \$0.15 & \textbf{\$1.38} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Cost reduction from current: 46\% (worst external) to 87\% (best external).
+
+\section{The Profound/Athena claim retraction}
+
+CoFounder initially wrote:
+
+\begin{quote}
+Profound and Athena both feed external search results too, so this is
+industry standard, not a unique liability.
+\end{quote}
+
+\begin{userturn}
+Profound and Athena both feed external search results too, so this is
+industry standard, not a unique liability --- can you find me cited evidence
+for this statement?
+\end{userturn}
+
+After searching, CoFounder retracted the claim. Actual findings:
+
+\begin{itemize}[nosep]
+  \item \textbf{Profound:} explicitly positions \textit{against} static API-based methods.
+    Quote from their own blog (tryprofound.com): ``actively monitoring AI Search
+    Engines like ChatGPT, Perplexity, and Copilot, rather than relying solely
+    on static API model calls.'' This is the \textbf{opposite} of what was
+    claimed. The strongest signal is that Profound uses direct interface
+    monitoring, likely headless browser scraping of consumer interfaces.
+  \item \textbf{Peec.ai} (a separate competitor) confirmed UI scraping: ``Peec AI
+    uses UI scraping technology to simulate real user interactions with AI
+    tools.''
+  \item \textbf{AthenaHQ:} methodology is \textit{genuinely undisclosed}. No
+    source verified whether they use LLM APIs, external search APIs, or
+    browser automation.
+\end{itemize}
+
+\textbf{Corrected framing:} the Brave/Firecrawl approach being discussed is
+a middle ground between ``trust the LLM API'' (current) and ``scrape the
+consumer UI'' (likely Profound/Peec). Not an industry default. The liability
+is larger than previously implied.
+
+\section{Per-LLM search routing (and the death of the Bing API)}
+
+\begin{userturn}
+No. Lets go back to the previous thread --- using brave api for anthropic,
+bing (if it has an api) for openAI and firecrawl api for Gemini.
+\end{userturn}
+
+\subsection{Critical finding}
+
+Microsoft retired the Bing Search API on 2025-08-11. The replacement,
+``Grounding with Bing Search'' via Azure AI Foundry, costs
+\textbf{\$35 per 1,000 queries} --- a 2$\times$ to 5$\times$ increase over
+the old S1--S5 tiers. This kills the OpenAI$\leftrightarrow$Bing pairing:
+
+\begin{enumerate}[nosep]
+  \item Bing's replacement is bundled, not standalone --- it requires an
+    Azure AI Foundry agent wrapper
+  \item At \$35/1k it is \textbf{3.5$\times$ more expensive} than OpenAI's
+    own in-LLM web\_search tool (\$10/1k), so routing OpenAI through
+    Bing-replacement is strictly worse than just keeping the in-LLM tool
+\end{enumerate}
+
+\subsection{Proposed routing cost (literal interpretation)}
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Leg} & \textbf{Per 44 prompts} \\
+\midrule
+Anthropic $\leftrightarrow$ Brave (\$0.005/search)             & \$0.220 + LLM \$0.201 = \$0.421 \\
+OpenAI $\leftrightarrow$ Bing replacement (\$0.035/search)     & \$1.540 + LLM \$0.159 = \textbf{\$1.699} \\
+Gemini $\leftrightarrow$ Firecrawl Growth (\$0.00133/search)   & \$0.059 + LLM \$0.071 = \$0.130 \\
+\midrule
+runCitationCheck total & \$2.250 \\
+Ancillary              & \$0.152 \\
+\textbf{Per click}     & \textbf{\$2.40} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The Bing-replacement leg alone consumes 85\% of the search budget. Without
+Bing this would be a $<$\$1/click configuration.
+
+\subsection{Repair C --- the fix that works}
+
+Keep the per-LLM routing principle, but drop Bing and reuse Brave across
+OpenAI+Anthropic (with shared cache per prompt):
+
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Component} & \textbf{Cost} \\
+\midrule
+Brave (1 search $\times$ 44, shared OpenAI+Anthropic) & \$0.220 \\
+Gemini $\leftrightarrow$ Firecrawl (1 search $\times$ 44)   & \$0.059 \\
+OpenAI LLM (+ Brave context)     & \$0.159 \\
+Anthropic LLM (+ Brave context)  & \$0.201 \\
+Gemini LLM (+ Firecrawl context) & \$0.071 \\
+Ancillary & \$0.152 \\
+\midrule
+\textbf{Total per click} & \textbf{$\sim$\$0.862} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Note on Anthropic$\leftrightarrow$Brave:} Anthropic's own web\_search
+server tool uses Brave Search as its underlying provider (publicly
+documented). Calling Brave directly gives us the same content at
+\$5/1k instead of Anthropic's \$10/1k markup, with no semantic loss.
+
+\section{Firecrawl engine selection --- dead end}
+
+\begin{userturn}
+Can we get firecrawl to use specific search indices?
+\end{userturn}
+
+\textbf{No.} The Firecrawl \texttt{/search} endpoint parameter list
+(docs.firecrawl.dev/api-reference/endpoint/search):
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Parameter} & \textbf{Purpose} \\
+\midrule
+\texttt{query}            & search string \\
+\texttt{limit}            & result count (default 5, max 100) \\
+\texttt{sources}          & content vertical: web / news / images \\
+\texttt{categories}       & content type: github / research / etc \\
+\texttt{tbs}              & time filter \\
+\texttt{location}         & geo locale \\
+\texttt{country}          & ISO country code \\
+\texttt{timeout}          & request timeout \\
+\texttt{ignoreInvalidURLs}& filter dead URLs \\
+\texttt{enterprise}       & ZDR options \\
+\texttt{scrapeOptions}    & scraping config \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+There is no \texttt{engine}, \texttt{provider}, \texttt{index}, or
+\texttt{search\_type} parameter. Firecrawl does not publicly disclose its
+underlying engine. The \texttt{sources} field selects content verticals
+(web/news/images), not search engines.
+
+The only vendors that expose engine selection as a first-class parameter are
+SERP-aggregator APIs: SerpAPI, Serper, SearchAPI.io, ScaleSerp, Bright Data
+SERP. For ``different engine per LLM'' the architecturally-correct vendor is
+SerpAPI (\$0.015/search), not Firecrawl.
+
+\section{MCP as a tool layer}
+
+\begin{userturn}
+Can these be served as tools within the LLM? [...] What if I move the
+search to MCP? does that reduce costs?
+\end{userturn}
+
+\subsection{Tool calling support per provider}
+
+\begin{center}
+\begin{tabular}{@{}lllc@{}}
+\toprule
+\textbf{Provider} & \textbf{Mechanism} & \textbf{Status} & \textbf{Hard cap?} \\
+\midrule
+OpenAI (Responses API)    & \texttt{tools: [\{ type: "function", ... \}]}              & First-class & No \\
+Anthropic (Messages)      & \texttt{tools: [\{ name, input\_schema \}]} + tool\_use    & First-class & \texttt{max\_uses} only on built-in web\_search, not custom tools \\
+Gemini (generateContent)  & \texttt{tools: [\{ functionDeclarations: [...] \}]}       & First-class & No \\
+Perplexity Sonar          & Limited (\texttt{sonar-pro} only; base \texttt{sonar} no) & Not supported on our model & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Multi-turn cost problem}
+
+Every tool invocation requires at least \textbf{two LLM round-trips}: the
+first to receive the tool\_use block, the second to send the tool\_result
+and receive the final answer. Each round-trip re-sends the full context.
+Without a hard cap, the model may call the tool 2--5 times. Cost and
+variance both return.
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Strategy} & \textbf{Round-trips} & \textbf{Per-prompt cost (Haiku)} \\
+\midrule
+Current in-LLM tool (capped at 2 searches) & 1 & \$0.0296 \\
+Stuff results in prompt                    & 1 & \$0.0096 \\
+Custom tool (1 search avg)                 & 2 & \$0.0102 \\
+Custom tool (2 searches avg)               & 3 & \$0.0153 \\
+Custom tool (uncapped, 4-deep)             & 5 & \$0.030+ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{MCP cost analysis}
+
+\textbf{Short answer: MCP does not reduce LLM token costs.} It is a protocol
+standardization, not a pricing tier.
+
+\begin{center}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Cost component} & \textbf{Without MCP} & \textbf{With MCP} \\
+\midrule
+Token billing for input/output     & Same & \textbf{Same} \\
+Tool definition overhead (~80 tok) & Yes  & Yes \\
+Multi-turn round-trips             & Yes  & Yes (internally, even in Claude's remote MCP) \\
+Search vendor cost                 & Direct (we pay Brave) & Direct (we pay Brave through the wrapper) \\
+LLM provider fee for MCP vs custom tool & n/a & No difference \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+What MCP \textit{does} provide (architectural, not cost):
+
+\begin{itemize}[nosep]
+  \item Write one search tool, reuse across all MCP-compatible LLMs
+  \item Server-side caching shared across providers in one runtime
+  \item Swap search backends without touching LLM code
+  \item Clean separation between the search layer and the LLM layer
+\end{itemize}
+
+The one angle where MCP \textit{could} reduce cost is cross-customer search
+deduplication via a shared MCP server cache. But the same savings are
+available by building an application-level shared search cache (Upstash
+Redis keyed on \texttt{(query, day)}), which does not require MCP.
+
+\textbf{Additional blocker:} only OpenAI and Anthropic have MCP client
+support in their server-side APIs. Gemini has MCP support only in Gemini
+CLI and Gemini Code Assist, not in \texttt{generateContent}. Perplexity
+Sonar has no MCP client support. So even with an MCP wrapper, we would
+still need per-provider glue for half the providers.
+
+\subsection{The one consumer-side scenario (and why it doesn't apply)}
+
+If citation checks were run interactively by users inside Claude Desktop
+with their personal \$20/mo Claude Pro subscription, MCP could let those
+users invoke our search tool without us paying any LLM tokens. But:
+
+\begin{itemize}[nosep]
+  \item Citation check is an automated SaaS feature, not an interactive conversation
+  \item It cannot run on a cron against a desktop app
+  \item It only covers Claude, not the other three providers
+\end{itemize}
+
+So MCP's consumer-subscription bypass doesn't apply to our product.
+
+\section{Prompt caching}
+
+\subsection{Per-provider specifications (verified live)}
+
+\begin{center}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+ & \textbf{OpenAI gpt-5.4-mini} & \textbf{Anthropic Haiku 4.5} & \textbf{Gemini 2.5 Flash} \\
+\midrule
+Mode & Automatic, no opt-in & Explicit (\texttt{cache\_control}) & Implicit + explicit \\
+Minimum prefix & 1,024 tok & \warn{\textbf{4,096 tok}} & 1,024 tok (explicit) \\
+Cache write cost & base rate (no premium) & \$1.25/M (5m) or \$2/M (1h) & base rate \\
+Cache read cost & \$0.075/M (\good{-90\%}) & \$0.10/M (\good{-90\%}) & $\sim$\$0.075/M ($\sim$-75\%) \\
+TTL & 5--10 min, \texttt{prompt\_cache\_retention} & 5 min default, 1h for 2$\times$ write & 1 hour default \\
+Breakpoints per req & n/a (auto) & up to 4 & 1 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Why citation-checker.ts gets zero caching benefit as-is}
+
+The stable prefix across all 176 calls in one run is the
+\texttt{CITATION\_SYSTEM\_PROMPT} at $\sim$250 tokens. This is
+\textbf{well under} every provider's minimum:
+
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Provider} & \textbf{Min cacheable} & \textbf{Our prefix} & \textbf{Eligible?} \\
+\midrule
+OpenAI              & 1,024 & $\sim$250 & No \\
+Anthropic Haiku 4.5 & \warn{\textbf{4,096}} & $\sim$250 & No \\
+Gemini (explicit)   & 1,024 & $\sim$250 & No \\
+Gemini (implicit)   & --    & $\sim$250 & Maybe, no guarantee \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Pure citation-checker.ts receives essentially zero benefit from
+prompt caching.} This is a correction on an earlier overstatement.
+
+\subsection{Path to actually unlock caching}
+
+Strategy C: pad the stable prefix to 4,096 tokens with load-bearing content
+(output format guides, sentiment rubric, per-site brand context). Mark
+\texttt{cache\_control: \{ type: "ephemeral" \}}.
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Provider} & \textbf{Without caching (176 $\times$ 4K)} & \textbf{With caching (1 write + 175 reads)} & \textbf{Savings} \\
+\midrule
+OpenAI             & \$0.541 & \$0.057 & \good{\$0.484 (89\%)} \\
+Anthropic Haiku    & \$0.721 & \$0.076 & \good{\$0.645 (89\%)} \\
+Gemini Flash       & \$0.216 & \$0.026 & \good{\$0.190 (88\%)} \\
+\midrule
+\textbf{Combined}  & \$1.479 & \textbf{\$0.160} & \good{\textbf{\$1.319/run}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+This requires the padding to be functionally useful, not noise.
+
+\section{Preemptive tool injection}
+
+\subsection{Mechanism}
+
+Run the search \textit{outside} the LLM, then construct a synthetic prior
+tool exchange so the model sees ``I already called web\_search, here's the
+tool\_result, now answer''. Single round-trip.
+
+Anthropic code shape:
+
+\begin{lstlisting}[language=JavaScript]
+const results = await brave.search({ query: prompt, count: 10 });
+
+await client.messages.create({
+  model: "claude-haiku-4-5-20251001",
+  max_tokens: 256,
+  system: CITATION_SYSTEM_PROMPT,
+  tools: [{
+    name: "web_search",
+    description: "Search the web for current information",
+    input_schema: { type: "object", properties: { query: { type: "string" } } }
+  }],
+  messages: [
+    { role: "user", content: prompt },
+    { role: "assistant", content: [
+      { type: "tool_use", id: "toolu_pre_001",
+        name: "web_search", input: { query: prompt } }
+    ]},
+    { role: "user", content: [
+      { type: "tool_result",
+        tool_use_id: "toolu_pre_001",
+        content: formatResults(results) }
+    ]}
+  ]
+});
+\end{lstlisting}
+
+\subsection{Comparison matrix}
+
+\begin{center}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Property} & \textbf{Stuff results} & \textbf{Full tool calling} & \textbf{Preemptive injection} \\
+\midrule
+Round-trips                                    & 1           & 2+           & \textbf{1} \\
+LLM-formulated query                           & No          & Yes          & No (we pick) \\
+Model treats evidence as search output         & No          & Yes          & \textbf{Yes} \\
+Model can chase a follow-up search             & No          & Yes          & \textbf{Yes (rare)} \\
+Predictable cost                               & Yes         & No           & \textbf{Yes} \\
+Token overhead vs stuff-results                & 0           & +500--2000   & \textbf{$\sim$+130} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Cost of preemptive injection with shared Brave across 3 providers}
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Component} & \textbf{Per call} & \textbf{$\times$ 44} \\
+\midrule
+Brave search (shared across OpenAI+Anthropic+Gemini) & \$0.005 & \$0.220 \\
+OpenAI gpt-5.4-mini (3,390 in, 256 out)              & \$0.00370 & \$0.163 \\
+Anthropic Haiku 4.5 (3,390 in, 256 out)              & \$0.00467 & \$0.205 \\
+Gemini 2.5 Flash (3,390 in, 256 out)                 & \$0.00166 & \$0.073 \\
+\midrule
+runCitationCheck & & \$0.661 \\
+Ancillary         & & \$0.152 \\
+\textbf{Per click} & & \textbf{$\sim$\$0.81} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{50-credit bump analysis}
+
+\begin{userturn}
+I want to actually increase the cost to 50 credits per citation check\ldots
+where does that put us?
+\end{userturn}
+
+\subsection{Customer-side math}
+
+A 10$\times$ price increase. Effective price per click:
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Credit source} & \textbf{At 5 credits} & \textbf{At 50 credits} \\
+\midrule
+Pro          & \$0.087 & \$0.864 \\
+Growth       & \$0.167 & \$1.671 \\
+Starter      & \$0.346 & \$3.462 \\
+One-off pack & \$0.500 & \$5.000 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Where 50 credits breaks customer budgets}
+
+At 50 credits per check, citation check consumes 80--95\% of every
+customer's monthly credit budget. Growth and Pro can no longer support
+daily monitoring on every site they are nominally allowed to track:
+
+\begin{center}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Tier} & \textbf{Sites} & \textbf{Cadence} & \textbf{Wanted checks/mo} & \textbf{Affordable at 50cr} & \textbf{Gap} \\
+\midrule
+Starter (weekly) & 5  & 4/mo/site     & 20          & 28  & +8 spare \\
+Growth (daily)   & 10 & 30/mo/site    & 300         & 149 & \warn{$-$151 short} \\
+Pro (daily)      & 20 & 30/mo/site    & 600         & 578 & \warn{$-$22 short} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Aditya's 2/day usage model}
+
+\begin{userturn}
+So the way I think about this is is that the user will want to do a citation
+check 2 times a day, this means 20 citation checks per day for growth --- 1000
+credits/day --- in 25 days --- 25000 credits\ldots and as many audits/week as
+the user wants.
+\end{userturn}
+
+\subsection{What the model implies per tier}
+
+\begin{center}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+\textbf{Tier} & \textbf{Sites} & \textbf{Checks/day} & \textbf{Checks/mo} & \textbf{Credits needed @ 50cr} & \textbf{Current} & \textbf{Shortfall} \\
+\midrule
+Starter & 5  & 10 & 250   & 12,500 & 1,430  & \warn{$-$11,070 (8.7$\times$)} \\
+Growth  & 10 & 20 & 500   & 25,000 & 7,465  & \warn{$-$17,535 (3.35$\times$)} \\
+Pro     & 20 & 40 & 1,000 & 50,000 & 28,915 & \warn{$-$21,085 (1.73$\times$)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Every paid tier's credit allocation breaks. Tier credit budgets do not
+sustain the intended usage pattern at 50 credits per check.
+
+\subsection{2$\times$-cost-on-Pro formula}
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Infrastructure path} & \textbf{Cost/click} & \textbf{2$\times$ cost target} & \textbf{Credits (@ \$0.01726/cr)} \\
+\midrule
+Current in-LLM tools (aggressive)             & \$4.86 & \$9.72 & 563 \\
+Current in-LLM tools (conservative)           & \$2.55 & \$5.10 & 295 \\
+Tools off, 3 providers (Sonar dropped)        & \$0.31 & \$0.62 & 36 \\
+Stuff Firecrawl Growth snippets               & \$0.64 & \$1.28 & 74 \\
+Stuff Brave snippets                          & \$0.80 & \$1.60 & 93 \\
+Preemptive injection $+$ Brave (warm)         & \$0.86 & \$1.72 & $\sim$100 \\
+Preemptive injection $+$ caching $+$ Brave    & \$0.86 & \$1.72 & $\sim$100 \\
+Full stack ($+$ response cache, 2/day pattern) & \$0.46 & \$0.92 & $\sim$53 \\
+Full stack average (mixed usage)              & \$0.25 & \$0.50 & $\sim$29 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Sonar retention and MCP reassessment}
+
+\begin{userturn}
+I don't want to drop sonar\ldots Perplexity has enough penetration in the
+markets\ldots also, just a second thought? What if I move the search to MCP?
+does that reduce costs?
+\end{userturn}
+
+\subsection{Sonar kept --- updated 4-provider cost}
+
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Component} & \textbf{Cost} \\
+\midrule
+Brave search $\times$ 44 (shared OpenAI+Anthropic+Gemini) & \$0.220 \\
+OpenAI preemptive injection                                & \$0.163 \\
+Anthropic preemptive injection                             & \$0.206 \\
+Gemini preemptive injection                                & \$0.073 \\
+\textbf{Sonar (native retrieval, 44 calls)}                & \textbf{\$0.246} \\
+Ancillary (warm)                                           & \$0.152 \\
+\midrule
+\textbf{Per click (warm, no cache)}                        & \textbf{$\sim$\$1.06} \\
+\textbf{Per click (prompt caching)}                        & \textbf{$\sim$\$0.96} \\
+\textbf{Per click (2/day blended with response caching)}   & \textbf{$\sim$\$0.58} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Sonar adds $\sim$\$0.25 per click. That is the price of measuring
+Perplexity's retrieval behavior.
+
+\subsection{2$\times$-cost-on-Pro updated for Sonar inclusion}
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Path} & \textbf{Cost/click} & \textbf{2$\times$ target} & \textbf{Credits @ \$0.01726/cr} \\
+\midrule
+Warm (no response cache)            & \$1.06 & \$2.12 & $\sim$123 \\
+Blended on 2/day (cache hot)        & \$0.58 & \$1.16 & $\sim$67 \\
+Average across mixed usage          & \$0.35 & \$0.70 & $\sim$41 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{MCP verdict --- no cost reduction}
+
+CoFounder verified that MCP does not reduce LLM token costs. Token billing
+is identical whether a tool is exposed via MCP, custom function calling, or
+preemptive injection. MCP's real value is architectural: single tool
+implementation, server-side caching, clean separation. But Gemini does not
+support MCP clients in its server-side API, and Sonar does not support MCP
+at all, so even with MCP we still need per-provider glue for half the
+providers.
+
+\textbf{Decision: skip MCP for the cost optimization pass. Consider it later
+as a distribution/integration lever.}
+
+\section{Usage-based pricing model}
+
+\begin{userturn}
+I really like this idea though: ``E. Usage-based pricing: fixed low sub $+$
+metered citation check. \$99 base $+$ \$0.50/check for everyone.''
+\end{userturn}
+
+CoFounder flagged the earlier ``Profound/Athena converging on this'' claim
+as overstated (not verified), and grounded the recommendation on the
+observable base-plus-metered pattern in Vercel AI Gateway, OpenAI API,
+Replicate, Anthropic API, Modal, Together, and Fireworks --- i.e., the
+pattern is well-established in general AI SaaS even if specific competitor
+adoption is undetermined.
+
+\subsection{Why usage-based fits this product}
+
+\begin{enumerate}[nosep]
+  \item Cost is dominated by variable unit cost ($\sim$80\% LLM + search API fees scaling 1:1 with clicks)
+  \item Usage varies wildly by customer type; tier caps fail for both ends
+  \item Citation check is a clean discrete action, easy to meter
+\end{enumerate}
+
+\section{Final pricing decision}
+
+\begin{userturn}
+First. The subscription pricing stays at --- \$99 starter, 249\$ growth,
+499\$ pro. Lets call them exactly what they are. Second --- verbatim and in
+full fidelity please draft a detailed latex document of this conversation in
+geo/docs/ folder. Third, the pricing solution is to look at our cost,
+multiply it by 1.5x and then arrive at dollar value pricing for overage. We
+adjust our costing there. Fourth, we should stage the architecture in a
+simple script and verify that it works in the case of one LLM. this should
+be a standalone script. Please write the TS for that script.
+\end{userturn}
+
+\subsection{Decision 1: Fixed subscription prices stay}
+
+\textbf{Starter \$99 / Growth \$249 / Pro \$499 per month.} Names unchanged.
+No tier rename, no price shift.
+
+\subsection{Decision 2: Overage pricing formula}
+
+\textbf{Overage rate $=$ variable cost per check $\times$ 1.5.}
+
+Applied to every cost architecture:
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Architecture} & \textbf{Cost/click} & \textbf{$\times$ 1.5} & \textbf{Rounded} \\
+\midrule
+Current (in-LLM tools, aggressive)                               & \$4.86 & \$7.29 & \$7.50 \\
+Current (in-LLM tools, conservative)                             & \$2.55 & \$3.83 & \$3.75 \\
+Preemptive injection $+$ Brave $+$ Sonar (warm, no cache)        & \$1.06 & \$1.59 & \textbf{\$1.60} \\
+Preemptive injection $+$ Brave $+$ Sonar $+$ prompt caching      & \$0.96 & \$1.44 & \$1.45 \\
+Preemptive injection $+$ full response cache $+$ Sonar           & \$0.58 & \$0.87 & \$0.90 \\
+Full stack across mixed usage                                    & \$0.35 & \$0.53 & \$0.55 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Lock-in at ship time: overage \$1.60/check} (based on the warm,
+no-response-cache path). Recalibrate downward once response caching ships
+and real-world cost is measured from provider invoices.
+
+\subsection{Decision 3: Free allowances per tier}
+
+Working backward from each base sub budget, assuming \$0.40/audit and
+\$1.06/check variable cost, with a platform margin buffer:
+
+\begin{center}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Tier} & \textbf{Base} & \textbf{Platform margin buffer} & \textbf{Audit budget} & \textbf{Check budget} & \textbf{Free checks} \\
+\midrule
+Starter (5 sites, weekly) & \$99  & \$30  & \$8 (20 audits) & \$61  & \textbf{50} \\
+Growth  (10 sites, daily) & \$249 & \$60  & \$100 (250)     & \$89  & \textbf{80} \\
+Pro     (20 sites, daily) & \$499 & \$100 & \$200 (500)     & \$199 & \textbf{200} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Final pricing table}
+
+\begin{center}
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+\textbf{Plan} & \textbf{Base/mo} & \textbf{Sites} & \textbf{Free checks} & \textbf{Overage} \\
+\midrule
+Free    & \$0   & 1  & 1 lifetime & no overage (must upgrade) \\
+\textbf{Starter} & \textbf{\$99}  & 5  & \textbf{50}  & \textbf{\$1.60/check} \\
+\textbf{Growth}  & \textbf{\$249} & 10 & \textbf{80}  & \textbf{\$1.60/check} \\
+\textbf{Pro}     & \textbf{\$499} & 20 & \textbf{200} & \textbf{\$1.60/check} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Margin verification at 2/day usage model}
+
+\begin{center}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+\textbf{Tier} & \textbf{Checks/mo} & \textbf{Free} & \textbf{Overage} & \textbf{Revenue} & \textbf{Variable cost} & \textbf{Margin} \\
+\midrule
+Starter (5 $\times$ 1/day)  & 125   & 50  & \$120  & \$219  & \$140.50 & \good{+\$78.50} \\
+Growth (10 $\times$ 2/day)  & 500   & 80  & \$672  & \$921  & \$630    & \good{+\$291} \\
+Pro (20 $\times$ 2/day)     & 1,000 & 200 & \$1,280 & \$1,779 & \$1,260  & \good{+\$519} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Every tier is profitable at the designed 1.5$\times$ cost markup. Heavy
+users generate disproportionate absolute margin.
+
+\subsection{Decision 4: Architecture staging script}
+
+A standalone TypeScript verification script has been written to
+\texttt{geo/scripts/verify-preemptive-injection.ts}. The script:
+
+\begin{itemize}[nosep]
+  \item Takes a citation prompt as CLI argument
+  \item Runs one Brave Search call externally
+  \item Constructs a synthetic assistant tool\_call $+$ tool result exchange
+  \item Sends one round-trip call to OpenAI \texttt{gpt-5.4-mini}
+  \item Measures latency, token usage, and dollar cost breakdown
+  \item Prints a per-stage report and extrapolates to a full 44-prompt run
+\end{itemize}
+
+Usage:
+
+\begin{lstlisting}[language=bash]
+BRAVE_API_KEY=... OPENAI_API_KEY=... \
+  npx tsx geo/scripts/verify-preemptive-injection.ts \
+  "What are the best dental clinics in Mumbai?"
+\end{lstlisting}
+
+The script has no imports from \texttt{lib/}, does not touch the database,
+does not consult \texttt{config.ts}, and does not charge credits. It is a
+clean-room verification of the architecture on a single LLM before wiring
+it into production.
+
+\section{Next steps and outstanding items}
+
+\subsection{Hard dependencies before pricing ships}
+
+\begin{enumerate}[nosep]
+  \item Run \texttt{verify-preemptive-injection.ts} against live Brave and
+    OpenAI credentials; confirm measured cost is within $\pm$20\% of analytical estimate
+  \item Extend the script to Anthropic and Gemini in follow-up verifications
+  \item Audit the GEO audit pipeline (\texttt{/api/sites/[id]/regenerate}) for
+    its own cost per run --- current \$0.40/audit estimate is unverified
+  \item Fix \texttt{rephraseSeeds} \texttt{temperature: 0.7} in
+    \texttt{citation-prompt-generator.ts:1222} for prompt determinism if
+    response caching is to work
+\end{enumerate}
+
+\subsection{Spec follow-ups}
+
+\begin{itemize}[nosep]
+  \item \textbf{TS-077 Architecture:} preemptive injection + Brave + Sonar retention + prompt determinism fix
+  \item \textbf{TS-078 Response caching:} Upstash Redis 24h cache on \texttt{(provider, model, prompt\_hash)}
+  \item \textbf{TS-079 Pricing migration:} Stripe metered billing pipeline + tier migration + overage guardrails
+  \item \textbf{TS-080 Audit cost audit:} same treatment for the GEO audit pipeline
+\end{itemize}
+
+\subsection{Open questions}
+
+\begin{itemize}[nosep]
+  \item Actual response cache hit rate in production once prompt determinism is fixed
+  \item Real-world token usage for preemptive injection (verification script will measure)
+  \item Audit cost verification (currently assumed \$0.40/audit)
+  \item Whether the 4,096-token padded system prompt for Anthropic Haiku caching is load-bearing or noise
+  \item Migration strategy for existing credit-model customers
+\end{itemize}
+
+\section{Acknowledgments and corrections}
+
+CoFounder made two factual errors during this session that Aditya caught
+and corrected:
+
+\begin{enumerate}[nosep]
+  \item \textbf{The Profound/Athena ``industry standard'' claim} was
+    unverified and later retracted after searching. Profound explicitly
+    positions against API-based approaches and likely uses headless browser
+    scraping of consumer interfaces. AthenaHQ's methodology is undisclosed.
+    Peec.ai is confirmed to use UI scraping. The Brave/Firecrawl approach
+    is \textit{not} an industry default --- it is a middle ground.
+  \item \textbf{The initial ``\$1.20 per click'' customer revenue figure}
+    used \texttt{BULK\_CREDIT\_PRICE\_INR = 20} (\$0.24/credit), which only
+    applies to the bulk CSV audit path. The citation check charge draws
+    from the fungible credit pool at subscription-tier prices ranging from
+    \$0.0173/credit (Pro) to \$0.10/credit (pack). Actual customer revenue
+    per 5-credit click: \$0.087 to \$0.500. The correction made the margin
+    gap wider than originally reported.
+\end{enumerate}
+
+Both corrections improved the analysis. They are recorded here to prevent
+their re-introduction in follow-up specifications.
+
+\vspace{1em}
+
+\begin{center}
+\rule{0.5\textwidth}{0.4pt}
+\end{center}
+
+\vspace{0.5em}
+
+\begin{center}\small
+\textit{End of document. Associated artifacts:}\\
+\texttt{geo/scripts/verify-preemptive-injection.ts} (verification script)\\
+\texttt{geo/lib/services/citation-checker.ts} (audited source)\\
+\texttt{geo/app/api/sites/[id]/citation-check/route.ts} (route wrapper)\\
+\texttt{geo/lib/config.ts} (pricing and tier configuration)
+\end{center}
+
+\end{document}

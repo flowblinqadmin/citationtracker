@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GEO HTML Fix Tool — Mockup</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #faf8f5;
+    --card:     #ffffff;
+    --border:   #e8e0d4;
+    --copper:   #c2652a;
+    --copper-bg:#fdf3ec;
+    --text:     #1a1714;
+    --t2:       #6b5e52;
+    --t3:       #9e8e82;
+    --green:    #166534;
+    --green-bg: #dcfce7;
+    --shadow:   0 2px 6px rgba(194,101,42,.10), 0 8px 24px rgba(194,101,42,.08);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── top bar ── */
+  header {
+    height: 52px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .logo { font-size: 13px; font-weight: 800; letter-spacing: .8px; color: var(--copper); text-transform: uppercase; }
+  .logo span { color: var(--t3); font-weight: 400; margin-left: 6px; text-transform: none; letter-spacing: 0; font-size: 12px; }
+  .badge { font-size: 11px; background: var(--copper-bg); color: var(--copper); border-radius: 20px; padding: 3px 10px; font-weight: 600; }
+
+  /* ── page shell ── */
+  .page { max-width: 1200px; margin: 0 auto; padding: 28px 24px 60px; }
+
+  .page-title { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .page-sub   { font-size: 13px; color: var(--t2); margin-bottom: 24px; }
+  .page-sub strong { color: var(--copper); }
+
+  /* ── fix count pill row ── */
+  .fix-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .fix-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 5px 12px;
+    font-size: 12px; font-weight: 600; color: var(--t2);
+  }
+  .fix-pill .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .dot-red  { background: #ef4444; }
+  .dot-gold { background: #f59e0b; }
+  .dot-blue { background: #3b82f6; }
+
+  /* ── two-panel layout ── */
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 40px 1fr;
+    gap: 0;
+    align-items: stretch;
+    min-height: 580px;
+  }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 16px 20px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .panel-icon {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+  }
+  .icon-in  { background: #f0f0f2; }
+  .icon-out { background: var(--green-bg); }
+
+  .panel-label {
+    font-size: 12px; font-weight: 700; color: var(--text);
+    text-transform: uppercase; letter-spacing: .5px;
+    line-height: 1.2;
+  }
+  .panel-desc { font-size: 11px; color: var(--t3); margin-top: 2px; }
+
+  .panel-body {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── left panel: textarea ── */
+  .code-area {
+    flex: 1;
+    width: 100%;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: "SF Mono", "Fira Code", "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #374151;
+    background: #fafaf9;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .code-area::placeholder { color: var(--t3); }
+
+  .panel-footer {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    transition: opacity .15s, background .15s;
+  }
+  .btn:hover { opacity: .88; }
+  .btn-primary   { background: var(--copper); color: #fff; }
+  .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--t2); }
+  .btn-green     { background: #16a34a; color: #fff; }
+
+  .char-count { font-size: 11px; color: var(--t3); margin-left: auto; }
+
+  /* ── arrow divider ── */
+  .arrow-col {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .arrow-badge {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--copper); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; box-shadow: 0 2px 8px rgba(194,101,42,.3);
+    flex-shrink: 0;
+  }
+
+  /* ── right panel: diff view ── */
+  .output-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px;
+    font-family: "SF Mono", "Fira Code", "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.65;
+    color: #374151;
+    background: #fafaf9;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .diff-line {
+    display: block;
+    padding: 1px 4px;
+    border-radius: 3px;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .diff-add { background: #dcfce7; color: #166534; }
+  .diff-del { background: #fee2e2; color: #991b1b; text-decoration: line-through; }
+  .diff-ctx { color: #6b7280; }
+  .diff-sep { color: var(--t3); font-style: italic; font-size: 11px; padding: 6px 0; display: block; }
+
+  /* ── fix summary chips ── */
+  .fix-summary {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+  .fix-chip {
+    font-size: 11px; font-weight: 600;
+    border-radius: 4px; padding: 2px 8px;
+  }
+  .chip-red  { background: #fee2e2; color: #991b1b; }
+  .chip-gold { background: #fef9c3; color: #713f12; }
+  .chip-blue { background: #dbeafe; color: #1e40af; }
+
+  /* ── empty / loading states ── */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 40px 24px;
+    color: var(--t3);
+    text-align: center;
+  }
+  .empty-icon { font-size: 32px; opacity: .4; }
+  .empty-text { font-size: 13px; line-height: 1.5; }
+
+  /* ── loading bar ── */
+  .loading-bar {
+    height: 3px;
+    background: linear-gradient(90deg, var(--copper) 0%, #e8a87c 50%, var(--copper) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 2px;
+    margin: 0 16px 12px;
+  }
+  @keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* ── page count bar ── */
+  .page-list {
+    border-top: 1px solid var(--border);
+    padding: 16px 24px 0;
+    margin-top: 24px;
+  }
+  .page-list-header {
+    font-size: 12px; font-weight: 600; color: var(--t2);
+    text-transform: uppercase; letter-spacing: .5px;
+    margin-bottom: 12px;
+  }
+  .page-items { display: flex; flex-direction: column; gap: 6px; }
+  .page-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; cursor: pointer;
+    transition: border-color .15s;
+  }
+  .page-item:hover { border-color: var(--copper); }
+  .page-item.active { border-color: var(--copper); background: var(--copper-bg); }
+  .page-url { font-size: 12px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .page-fixes { font-size: 11px; font-weight: 700; color: #ef4444; }
+  .page-status { font-size: 11px; color: var(--t3); flex-shrink: 0; }
+
+  /* ── zip download banner ── */
+  .zip-banner {
+    margin-top: 20px;
+    background: var(--copper-bg);
+    border: 1.5px solid var(--copper);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .zip-icon { font-size: 28px; flex-shrink: 0; }
+  .zip-text { flex: 1; }
+  .zip-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .zip-sub   { font-size: 12px; color: var(--t2); margin-top: 2px; }
+
+  @media (max-width: 700px) {
+    .panels { grid-template-columns: 1fr; grid-template-rows: auto 40px auto; }
+    .arrow-col { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">FlowBlinq GEO <span>/ HTML Fix Tool</span></div>
+  <div class="badge">flowblinq.com · 194 fixes ready</div>
+</header>
+
+<div class="page">
+
+  <div class="page-title">Apply Your GEO Fixes</div>
+  <div class="page-sub">
+    Paste any page's HTML on the left. We apply your <strong>194 recommended fixes</strong> and return clean, AI-optimised HTML ready to deploy.
+  </div>
+
+  <!-- fix type summary -->
+  <div class="fix-row">
+    <div class="fix-pill"><span class="dot dot-red"></span>12 critical — missing schema</div>
+    <div class="fix-pill"><span class="dot dot-gold"></span>47 high — llms.txt gaps</div>
+    <div class="fix-pill"><span class="dot dot-blue"></span>135 medium — heading / meta / alt</div>
+    <span style="font-size:12px;color:var(--t3);margin-left:4px;">Applies fixes relevant to the page you paste</span>
+  </div>
+
+  <!-- page selector -->
+  <div style="margin-bottom:16px;">
+    <div style="font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Select a page from your last scan</div>
+    <div class="page-items">
+      <div class="page-item active">
+        <span class="page-url">flowblinq.com/</span>
+        <span class="page-fixes">31 fixes</span>
+        <span class="page-status">Ready</span>
+      </div>
+      <div class="page-item">
+        <span class="page-url">flowblinq.com/pricing</span>
+        <span class="page-fixes">18 fixes</span>
+        <span class="page-status">Ready</span>
+      </div>
+      <div class="page-item">
+        <span class="page-url">flowblinq.com/features/agentic-commerce</span>
+        <span class="page-fixes">24 fixes</span>
+        <span class="page-status">Ready</span>
+      </div>
+      <div class="page-item">
+        <span class="page-url">flowblinq.com/blog/ai-commerce-protocol</span>
+        <span class="page-fixes">9 fixes</span>
+        <span class="page-status">Ready</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- two panels -->
+  <div class="panels">
+
+    <!-- LEFT: paste HTML -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-icon icon-in">📄</div>
+        <div>
+          <div class="panel-label">Your Current HTML</div>
+          <div class="panel-desc">Paste the source of any page on your site</div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <textarea class="code-area" placeholder="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+  &lt;head&gt;
+    &lt;title&gt;Your page title&lt;/title&gt;
+    ...
+  &lt;/head&gt;
+  &lt;body&gt;
+    ...
+  &lt;/body&gt;
+&lt;/html&gt;
+
+Paste your full page HTML here.
+We'll apply the 31 fixes identified for this page."><!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>FlowBlinq — AI Commerce Platform</title>
+    <meta name="description" content="FlowBlinq helps merchants sell through AI.">
+  </head>
+  <body>
+    <h1>Make your catalog visible to AI</h1>
+    <p>FlowBlinq connects your product catalog to AI shopping agents.</p>
+    <img src="/hero.png">
+    <a href="/pricing">See pricing</a>
+  </body>
+</html></textarea>
+      </div>
+      <div class="panel-footer">
+        <button class="btn btn-secondary" onclick="clearInput()">Clear</button>
+        <button class="btn btn-secondary" onclick="pasteFromClipboard()">Paste ⌘V</button>
+        <span class="char-count" id="char-count">491 chars</span>
+      </div>
+    </div>
+
+    <!-- ARROW -->
+    <div class="arrow-col">
+      <div class="arrow-badge" title="Apply fixes">→</div>
+    </div>
+
+    <!-- RIGHT: fixed output -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-icon icon-out">✅</div>
+        <div>
+          <div class="panel-label">Fixed HTML</div>
+          <div class="panel-desc">31 fixes applied · copy or download</div>
+        </div>
+      </div>
+
+      <!-- fix chips -->
+      <div class="fix-summary">
+        <span class="fix-chip chip-red">4 schema blocks added</span>
+        <span class="fix-chip chip-gold">img alt text filled</span>
+        <span class="fix-chip chip-gold">meta description expanded</span>
+        <span class="fix-chip chip-blue">heading hierarchy fixed</span>
+        <span class="fix-chip chip-blue">Open Graph tags added</span>
+        <span class="fix-chip chip-blue">llms.txt hint injected</span>
+      </div>
+
+      <div class="panel-body">
+        <div class="output-body">
+
+<span class="diff-ctx">&lt;!DOCTYPE html&gt;</span>
+<span class="diff-del">&lt;html lang="en"&gt;</span>
+<span class="diff-add">&lt;html lang="en" itemscope itemtype="https://schema.org/WebPage"&gt;</span>
+<span class="diff-ctx">  &lt;head&gt;</span>
+<span class="diff-del">    &lt;title&gt;FlowBlinq — AI Commerce Platform&lt;/title&gt;</span>
+<span class="diff-add">    &lt;title&gt;FlowBlinq — AI Commerce Middleware | Connect Catalogs to ChatGPT, Perplexity &amp; Gemini&lt;/title&gt;</span>
+<span class="diff-del">    &lt;meta name="description" content="FlowBlinq helps merchants sell through AI."&gt;</span>
+<span class="diff-add">    &lt;meta name="description" content="FlowBlinq is AI commerce middleware for mid-market merchants on Magento, Miva, and NetSuite. Make your product catalog visible to ChatGPT, Perplexity, and Google AI Overviews in under a week."&gt;</span>
+<span class="diff-add">    &lt;meta property="og:title" content="FlowBlinq — AI Commerce Middleware"&gt;</span>
+<span class="diff-add">    &lt;meta property="og:description" content="Connect your catalog to AI shopping agents. $299/mo + 2% on AI-attributed sales."&gt;</span>
+<span class="diff-add">    &lt;meta property="og:type" content="website"&gt;</span>
+<span class="diff-add">    &lt;link rel="alternate" type="text/plain" href="/llms.txt"&gt;</span>
+<span class="diff-sep">  ··· 4 lines unchanged ···</span>
+<span class="diff-add">    &lt;script type="application/ld+json"&gt;</span>
+<span class="diff-add">    {</span>
+<span class="diff-add">      "@context": "https://schema.org",</span>
+<span class="diff-add">      "@type": "SoftwareApplication",</span>
+<span class="diff-add">      "name": "FlowBlinq",</span>
+<span class="diff-add">      "applicationCategory": "BusinessApplication",</span>
+<span class="diff-add">      "description": "AI commerce middleware connecting product catalogs to AI shopping agents.",</span>
+<span class="diff-add">      "offers": { "@type": "Offer", "price": "299", "priceCurrency": "USD" }</span>
+<span class="diff-add">    }</span>
+<span class="diff-add">    &lt;/script&gt;</span>
+<span class="diff-ctx">  &lt;/head&gt;</span>
+<span class="diff-ctx">  &lt;body&gt;</span>
+<span class="diff-del">    &lt;h1&gt;Make your catalog visible to AI&lt;/h1&gt;</span>
+<span class="diff-add">    &lt;h1&gt;FlowBlinq — Make Your Product Catalog Visible to AI Shopping Agents&lt;/h1&gt;</span>
+<span class="diff-ctx">    &lt;p&gt;FlowBlinq connects your product catalog to AI shopping agents.&lt;/p&gt;</span>
+<span class="diff-del">    &lt;img src="/hero.png"&gt;</span>
+<span class="diff-add">    &lt;img src="/hero.png" alt="FlowBlinq dashboard showing AI visibility scores for an ecommerce catalog"&gt;</span>
+<span class="diff-del">    &lt;a href="/pricing"&gt;See pricing&lt;/a&gt;</span>
+<span class="diff-add">    &lt;a href="/pricing" aria-label="View FlowBlinq pricing — starts at $299/mo"&gt;See pricing&lt;/a&gt;</span>
+<span class="diff-ctx">  &lt;/body&gt;</span>
+<span class="diff-ctx">&lt;/html&gt;</span>
+
+        </div>
+      </div>
+
+      <div class="panel-footer">
+        <button class="btn btn-secondary" onclick="copyFixed()">Copy HTML</button>
+        <button class="btn btn-green" onclick="downloadPage()">⬇ Download this page</button>
+      </div>
+    </div>
+
+  </div><!-- /panels -->
+
+  <!-- ZIP download banner -->
+  <div class="zip-banner">
+    <div class="zip-icon">📦</div>
+    <div class="zip-text">
+      <div class="zip-title">Download all 20 pages fixed — ready to deploy</div>
+      <div class="zip-sub">Full ZIP · 20 HTML files · 194 fixes applied · replaces your existing pages drop-in</div>
+    </div>
+    <button class="btn btn-primary" style="flex-shrink:0;padding:10px 20px;font-size:13px;" onclick="downloadZip()">
+      ⬇ Download ZIP  <span style="opacity:.7;font-weight:400;margin-left:4px;">5 cr</span>
+    </button>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+  function clearInput() {
+    document.querySelector('.code-area').value = '';
+    document.getElementById('char-count').textContent = '0 chars';
+  }
+  function pasteFromClipboard() {
+    navigator.clipboard.readText().then(t => {
+      document.querySelector('.code-area').value = t;
+      document.getElementById('char-count').textContent = t.length + ' chars';
+    }).catch(() => {});
+  }
+  document.querySelector('.code-area').addEventListener('input', function() {
+    document.getElementById('char-count').textContent = this.value.length + ' chars';
+  });
+  function copyFixed() {
+    const lines = [...document.querySelectorAll('.diff-add,.diff-ctx')].map(el => el.textContent).join('\n');
+    navigator.clipboard.writeText(lines).then(() => {
+      const btn = event.target; btn.textContent = 'Copied ✓';
+      setTimeout(() => btn.textContent = 'Copy HTML', 1800);
+    });
+  }
+  function downloadPage() {
+    alert('[mockup] Would download: flowblinq.com-index-fixed.html');
+  }
+  function downloadZip() {
+    alert('[mockup] Would download: flowblinq.com-geo-fixes.zip (5 credits)');
+  }
+  // page selector
+  document.querySelectorAll('.page-item').forEach(item => {
+    item.addEventListener('click', function() {
+      document.querySelectorAll('.page-item').forEach(i => i.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>

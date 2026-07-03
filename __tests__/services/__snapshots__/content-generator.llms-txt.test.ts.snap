@@ -1,0 +1,39 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ES-082 §c.1 — Direction B prompt builder (RM independent) > U9: snapshot of rendered Direction B user prompt (synthetic Manipal fixture) 1`] = `
+"Below is the site data for manipalhospitals.com. Produce a CONDENSED llms.txt following the llmstxt.org spec.
+
+REQUIREMENTS:
+1. Set the H1 to the exact company name from the SITE DATA. Place a one-sentence answer-first summary on the next line as a blockquote (>). The summary states what the company does and for whom.
+
+2. Place sections in this order: ## About, ## Products/Services, ## FAQ, ## Key Concepts, ## Evidence, ## Team, ## Content, ## Contact.
+
+3. ## About — 2-3 paragraphs, concrete and specific. Include the founding year or any product/update dates that appear in the SITE DATA explicitly (e.g. "Founded in 2023", "Updated Q1 2025") — AI bots weight recently-dated content 85% more in citations.
+
+4. ## Products/Services — bullet list using real product or service names from the SITE DATA. One short description line each. No nested bullets.
+
+5. ## Key Concepts — define 5-8 domain-specific terms. Each definition starts with "is" or "refers to" (this exact format is cited 32% more by Perplexity). For each term: bold name followed by colon, one extractable definition sentence, one sentence on why it matters to the target audience.
+
+6. ## FAQ — Do NOT inline Q&A pairs. Write one sentence: "Frequently asked questions are available at:" followed by a bullet list of these URLs:
+   - https://www.manipalhospitals.com/specialties/cardiac-sciences/
+   - https://www.manipalhospitals.com/specialties/oncology/
+
+7. ## Team — for each named person in the SITE DATA write the full name, exact title or role, a one-sentence expertise summary, and a LinkedIn URL when present. Use only real names from the SITE DATA — do not invent.
+
+8. ## Evidence — format each statistic as: "[number or percentage] [specific claim] (Source: [name or URL])". Example: "84% of B2B buyers start product research on AI assistants before visiting vendor sites (FlowBlinq GEO Research, 2025)". Use only stats present in the SITE DATA — do not invent.
+
+9. ## Content — links to key blog posts with the real titles from the SITE DATA.
+
+10. ## Contact — real email addresses and URLs from the SITE DATA. Omit the section entirely when none are found. Do not invent phone numbers, emails, or URLs.
+
+11. Target length: 1500-3000 words.
+
+12. Return ONLY the file content. No code fences. No explanations.
+
+Top GEO improvements needed: Add MedicalSpecialty schema; expand FAQ; add AI bot directives
+
+SITE DATA:
+Manipal Hospitals is a multi-specialty hospital network.
+
+Return ONLY the condensed llms.txt content. No code fences. No explanations."
+`;

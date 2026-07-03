@@ -1,0 +1,15 @@
+FROM node:24-alpine AS test
+
+WORKDIR /app
+
+# Copy package files first for layer caching
+COPY package.json package-lock.json ./
+
+# Install ALL deps (including devDependencies for vitest)
+RUN npm ci
+
+# Copy source
+COPY . .
+
+# Run tests — exit code propagates
+CMD ["npm", "test"]

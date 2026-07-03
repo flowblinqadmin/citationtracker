@@ -1,0 +1,48 @@
+# GA4 Measurement Protocol v2 — default sink template (TS-088 §4.4).
+# Customer overrides via pipe.yaml → sink.template_path.
+#
+# Template variables expected at render time (provide via pipe.yaml sink.secrets):
+#   measurement_id  — GA4 Measurement ID, e.g. "G-XXXXXXXXXX"
+#   api_secret      — GA4 Measurement Protocol API secret
+#
+# Example pipe.yaml block:
+#   sink:
+#     template_path: sinks/ga4.yaml
+#     secrets:
+#       measurement_id: G-XXXXXXXXXX
+#       api_secret: ${GA4_API_SECRET}     # ${ENV_VAR} substitution supported
+name: ga4
+
+request:
+  method: POST
+  url: "https://www.google-analytics.com/mp/collect?measurement_id={{ measurement_id }}&api_secret={{ api_secret }}"
+  headers:
+    Content-Type: application/json
+  body_json:
+    client_id: "{{ or_default(row.visitor_id, \"anon-\" + row.id) }}"
+    timestamp_micros: "{{ rfc3339_to_micros(row.viewed_at) }}"
+    events:
+      # Type-aware: engagement-typed rows (visibility-hidden beacons) become
+      # GA4 user_engagement events with engagement_time_msec; everything else
+      # is a page_view. Aligns with GA4 Measurement Protocol semantics.
+      - name: "{{ \"user_engagement\" if row.type == \"engagement\" else \"page_view\" }}"
+        params:
+          page_location: "{{ truncate(row.page_url, 100) }}"
+          page_referrer: "{{ truncate(or_default(row.referrer, \"\"), 100) }}"
+          country: "{{ or_default(row.country, \"\") }}"
+          screen_resolution: "{{ or_default(row.screen_width, 0) }}"
+          engagement_time_msec: "{{ or_default(row.time_on_page_ms, 1) }}"
+          session_id: "{{ or_default(row.session_id, \"sess-\" + row.id) }}"
+
+constraints:
+  max_events_per_request: 25
+  max_params_per_event: 25
+  max_param_value_bytes: 100
+  max_body_bytes: 131072
+  retriable_status_codes: [408, 429, 500, 502, 503, 504]
+  non_retriable_status_codes: [400, 401, 403, 404, 422]
+  retry_policy:
+    max_attempts: 5
+    initial_backoff_ms: 500
+    max_backoff_ms: 30000
+    jitter: true
