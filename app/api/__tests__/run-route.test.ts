@@ -21,10 +21,16 @@ describe.skipIf(!dbUrl)("POST /api/brands/[id]/run (Postgres)", () => {
   let clientId: string;
   let fetchMock: ReturnType<typeof vi.fn>;
 
-  const call = () =>
-    POST(new NextRequest("http://x/api/brands/x/run", { method: "POST" }), {
-      params: Promise.resolve({ id: clientId }),
-    });
+  const call = (body?: unknown) =>
+    POST(
+      new NextRequest("http://x/api/brands/x/run", {
+        method: "POST",
+        ...(body !== undefined
+          ? { body: JSON.stringify(body), headers: { "Content-Type": "application/json" } }
+          : {}),
+      }),
+      { params: Promise.resolve({ id: clientId }) },
+    );
 
   beforeEach(async () => {
     process.env.QSTASH_TOKEN = "qstash-test-token";
@@ -129,6 +135,31 @@ describe.skipIf(!dbUrl)("POST /api/brands/[id]/run (Postgres)", () => {
     const res = await call();
     expect(res.status).toBe(404);
     expect(await balance()).toBe(20);
+  });
+
+  it("scoped run: single prompt on a single platform costs 1 credit and stores scope", async () => {
+    const prompts = await tdb.listPrompts(TEAM, clientId);
+    const res = await call({ promptIds: [prompts[0].promptId], platforms: ["google"] });
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.credits).toBe(1);
+    expect(await balance()).toBe(19);
+    expect(body.run.promptsTotal).toBe(1);
+    expect(body.run.scope.platforms).toEqual(["google"]);
+    expect(body.run.scope.promptVersionIds).toHaveLength(1);
+    // worker payload is unchanged — geo reads scope from the run row
+    const payload = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(payload).toEqual({ runId: body.run.id, clientId, cursor: 0 });
+  });
+
+  it("400 on invalid scope with zero side effects", async () => {
+    const res = await call({ promptIds: ["tp_not_mine"] });
+    expect(res.status).toBe(400);
+    expect(await balance()).toBe(20);
+    expect(await tdb.listRuns(TEAM, clientId)).toEqual([]);
+    const res2 = await call({ platforms: ["bing"] });
+    expect(res2.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("429 over the per-team rate limit", async () => {

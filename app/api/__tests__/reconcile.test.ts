@@ -54,6 +54,18 @@ describe.skipIf(!dbUrl)("GET /api/cron/reconcile (Postgres)", () => {
     expect(await balance()).toBe(16);
   });
 
+  it("prices an uncharged SCOPED run by its platform subset (10 prompts × 1 platform → 2 credits)", async () => {
+    const id = `tr_rec_scoped_${runSeq++}`;
+    await db.execute(sql`
+      INSERT INTO tracker.runs (id, client_id, org_id, period, kind, status, prompts_total, scope)
+      VALUES (${id}, 'tc_rec', ${ORG}, '2026-07', 'manual', 'complete', 10, '{"platforms":["google"]}'::jsonb)
+    `);
+    const res = await call();
+    expect((await res.json()).debited).toBe(1);
+    // 10 × 1 × $0.013 = $0.13 → 2 credits
+    expect(await balance()).toBe(18);
+  });
+
   it("is idempotent — a second pass changes nothing", async () => {
     await seedRun("complete");
     await call();

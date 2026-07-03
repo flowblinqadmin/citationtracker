@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS tracker.runs (
   metrics jsonb,
   prompt_versions_changed jsonb DEFAULT '[]',
   models_used jsonb DEFAULT '{}',
+  scope jsonb,
   created_at timestamp DEFAULT now()
 );
 
@@ -139,6 +140,7 @@ CREATE TABLE IF NOT EXISTS tracker.responses (
   response_text text,
   cited_urls jsonb DEFAULT '[]',
   brand_mentioned boolean NOT NULL DEFAULT false,
+  sentiment text,
   response_time_ms integer,
   error text,
   created_at timestamp DEFAULT now()

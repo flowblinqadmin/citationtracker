@@ -16,16 +16,24 @@ export const MODEL_COST_ESTIMATES = {
 
 export const CITATION_EXEC_MARGIN = 1.3;
 export const CREDIT_USD = 0.1; // geo: $10 per 100-credit pack
-const PLATFORM_COUNT = 3; // geo's worker always queries all three
+export const ALL_PLATFORM_COUNT = 3;
 
 export const CITATION_EXEC_PRICE_USD =
   Math.max(...Object.values(MODEL_COST_ESTIMATES)) * CITATION_EXEC_MARGIN;
 
-/** Credits charged for one run of `numPrompts` prompts across all platforms. */
-export function citationRunCredits(numPrompts: number): number {
+/**
+ * Credits charged for one run of `numPrompts` prompts on `platformCount`
+ * platforms (default: all 3). Per prompt-execution the price is flat
+ * (priciest model × margin), so a single prompt on a single model is the
+ * smallest billable unit — 1 credit.
+ */
+export function citationRunCredits(numPrompts: number, platformCount = ALL_PLATFORM_COUNT): number {
   if (!Number.isInteger(numPrompts) || numPrompts <= 0) {
     throw new Error(`citationRunCredits: numPrompts must be a positive integer, got ${numPrompts}`);
   }
-  const usd = numPrompts * PLATFORM_COUNT * CITATION_EXEC_PRICE_USD;
+  if (!Number.isInteger(platformCount) || platformCount < 1 || platformCount > ALL_PLATFORM_COUNT) {
+    throw new Error(`citationRunCredits: platformCount must be 1–${ALL_PLATFORM_COUNT}, got ${platformCount}`);
+  }
+  const usd = numPrompts * platformCount * CITATION_EXEC_PRICE_USD;
   return Math.max(1, Math.ceil(usd / CREDIT_USD));
 }

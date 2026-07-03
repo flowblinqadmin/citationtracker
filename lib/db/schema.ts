@@ -21,6 +21,8 @@ import type {
   TrackerRunKind,
   TrackerCompetitor,
   TrackerRunMetrics,
+  TrackerRunScope,
+  TrackerSentiment,
   BrandKeywords,
 } from "@/lib/types/tracker";
 
@@ -142,6 +144,10 @@ export const trackerRuns = trackerSchema.table("runs", {
   metrics: jsonb("metrics").$type<TrackerRunMetrics>(),
   promptVersionsChanged: jsonb("prompt_versions_changed").$type<string[]>().default([]),
   modelsUsed: jsonb("models_used").$type<Record<string, string>>().default({}),
+  // Optional execution subset ({promptVersionIds?, platforms?}); NULL = full
+  // worklist. Geo's runner filters by this (geo migration
+  // 20260703-tracker-run-scope-sentiment).
+  scope: jsonb("scope").$type<TrackerRunScope | null>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -158,6 +164,9 @@ export const trackerResponses = trackerSchema.table("responses", {
   responseText: text("response_text"),
   citedUrls: jsonb("cited_urls").$type<string[]>().default([]),
   brandMentioned: boolean("brand_mentioned").notNull().default(false),
+  // 'positive' | 'neutral' | 'negative'; NULL = not classified (pre-migration
+  // rows, brand not mentioned, or classification failed).
+  sentiment: text("sentiment").$type<TrackerSentiment | null>(),
   responseTimeMs: integer("response_time_ms"),
   error: text("error"),
   createdAt: timestamp("created_at").defaultNow(),

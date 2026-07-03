@@ -51,6 +51,22 @@ describe("citationRunCredits", () => {
     expect(() => citationRunCredits(0)).toThrow();
     expect(() => citationRunCredits(-1)).toThrow();
   });
+
+  it("scales with the selected platform count (single-model runs cost less)", () => {
+    // 30 × 1 × $0.013 = $0.39 → 4 credits; full 3-platform price unchanged
+    expect(citationRunCredits(30, 1)).toBe(4);
+    expect(citationRunCredits(30, 3)).toBe(citationRunCredits(30));
+  });
+
+  it("single prompt on a single model = 1 credit", () => {
+    expect(citationRunCredits(1, 1)).toBe(1);
+  });
+
+  it("rejects platform counts outside 1–3", () => {
+    expect(() => citationRunCredits(1, 0)).toThrow();
+    expect(() => citationRunCredits(1, 4)).toThrow();
+    expect(() => citationRunCredits(1, 1.5)).toThrow();
+  });
 });
 
 // ── DB-backed ledger tests ──────────────────────────────────────────────────

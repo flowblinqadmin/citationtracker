@@ -175,6 +175,61 @@ describe.skipIf(!dbUrl)("tracker-db (Postgres)", () => {
       expect(r.kind).toBe("not_found");
       expect(await tdb.listRuns(TEAM, foreignClientId)).toEqual([]);
     });
+
+    describe("scoped runs", () => {
+      let secondPromptId: string;
+      beforeEach(async () => {
+        const p = await tdb.createPrompt(TEAM, clientId, { name: "P2", category: "brand", text: "t2" });
+        secondPromptId = p.promptId;
+      });
+
+      it("single prompt: stores its LATEST version id in scope, promptsTotal=1", async () => {
+        await tdb.updatePromptText(TEAM, clientId, secondPromptId, "t2 v2");
+        const r = await tdb.createManualRunRow(TEAM, clientId, { promptIds: [secondPromptId] });
+        if (r.kind !== "run") throw new Error(`expected run, got ${r.kind}`);
+        expect(r.promptCount).toBe(1);
+        expect(r.platformCount).toBe(3);
+        expect(r.run.promptsTotal).toBe(1);
+        expect(r.run.scope?.promptVersionIds).toHaveLength(1);
+        const prompts = await tdb.listPrompts(TEAM, clientId);
+        expect(prompts.find((p) => p.promptId === secondPromptId)?.version).toBe(2);
+      });
+
+      it("single platform: scope stores it and platformCount=1", async () => {
+        const r = await tdb.createManualRunRow(TEAM, clientId, { platforms: ["google"] });
+        if (r.kind !== "run") throw new Error(`expected run, got ${r.kind}`);
+        expect(r.platformCount).toBe(1);
+        expect(r.promptCount).toBe(2);
+        expect(r.run.scope?.platforms).toEqual(["google"]);
+        expect(r.run.scope?.promptVersionIds).toBeUndefined();
+      });
+
+      it("no scope input → scope stays NULL (full run, geo behavior unchanged)", async () => {
+        const r = await tdb.createManualRunRow(TEAM, clientId);
+        if (r.kind !== "run") throw new Error(`expected run, got ${r.kind}`);
+        expect(r.run.scope).toBeNull();
+      });
+
+      it("all platforms selected normalizes to no platform filter", async () => {
+        const r = await tdb.createManualRunRow(TEAM, clientId, { platforms: ["google", "openai", "perplexity", "google"] });
+        if (r.kind !== "run") throw new Error(`expected run, got ${r.kind}`);
+        expect(r.platformCount).toBe(3);
+        expect(r.run.scope).toBeNull();
+      });
+
+      it("rejects unknown platforms", async () => {
+        const r = await tdb.createManualRunRow(TEAM, clientId, { platforms: ["bing" as never] });
+        expect(r.kind).toBe("invalid_scope");
+      });
+
+      it("rejects prompt ids that are not this brand's active prompts", async () => {
+        const r = await tdb.createManualRunRow(TEAM, clientId, { promptIds: ["tp_nope"] });
+        expect(r.kind).toBe("invalid_scope");
+        await tdb.archivePrompt(TEAM, clientId, secondPromptId);
+        const r2 = await tdb.createManualRunRow(TEAM, clientId, { promptIds: [secondPromptId] });
+        expect(r2.kind).toBe("invalid_scope");
+      });
+    });
   });
 });
 

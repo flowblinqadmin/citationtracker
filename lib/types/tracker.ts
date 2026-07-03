@@ -24,6 +24,19 @@ export type TrackerRunFrequency = "manual" | "weekly" | "monthly";
 export type TrackerRunStatus = "pending" | "running" | "complete" | "failed";
 export type TrackerRunKind = "scheduled" | "manual";
 
+/**
+ * Optional subset a run executes (single-prompt / single-platform runs).
+ * NULL/absent = the full worklist. Geo's runner ignores empty arrays — a
+ * scope can narrow, never empty, a run.
+ */
+export interface TrackerRunScope {
+  promptVersionIds?: string[];
+  platforms?: TrackerPlatform[];
+}
+
+/** How a response portrays the brand (null = not classified). */
+export type TrackerSentiment = "positive" | "neutral" | "negative";
+
 /** A named competitor tracked for Share-of-AI-Voice. */
 export interface TrackerCompetitor {
   name: string;

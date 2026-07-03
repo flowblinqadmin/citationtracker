@@ -12,6 +12,7 @@ import { citationRunCredits, debitForRun, refundForRun } from "@/lib/credits";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getCronSecret } from "@/lib/cron-auth";
 import { GEO_ORIGIN } from "@/lib/config";
+import { runScopeSchema } from "@/app/api/brands/brand-schema";
 
 const RUNS_PER_HOUR = 10; // per team — runs burn paid provider APIs on geo's keys
 
@@ -48,26 +49,36 @@ async function enqueueWorker(runId: string, clientId: string): Promise<void> {
   }).catch((err) => console.error(`[run] direct worker call failed for ${runId}:`, err));
 }
 
-export async function POST(_req: NextRequest, { params }: Ctx) {
+export async function POST(req: NextRequest, { params }: Ctx) {
   const ctx = await getTeamContext();
   if (!ctx) return NextResponse.json({ error: "No team for this user" }, { status: 401 });
+
+  // Optional body narrows the run to specific prompts and/or platforms.
+  const rawBody = await req.json().catch(() => ({}));
+  const parsed = runScopeSchema.safeParse(rawBody ?? {});
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid run scope" }, { status: 400 });
+  }
 
   const rate = await checkRateLimit(`cite-run:${ctx.teamId}`, RUNS_PER_HOUR, 60 * 60 * 1000);
   if (!rate.allowed) {
     return NextResponse.json({ error: "Rate limit exceeded — try again later" }, { status: 429 });
   }
 
-  const created = await createManualRunRow(ctx.teamId, (await params).id);
+  const created = await createManualRunRow(ctx.teamId, (await params).id, parsed.data);
   if (created.kind === "not_found") return NextResponse.json({ error: "Brand not found" }, { status: 404 });
   if (created.kind === "no_prompts") {
     return NextResponse.json({ error: "Add at least one prompt before running." }, { status: 400 });
+  }
+  if (created.kind === "invalid_scope") {
+    return NextResponse.json({ error: created.message }, { status: 400 });
   }
   if (created.kind === "in_flight") {
     return NextResponse.json({ run: created.run, started: false, alreadyRunning: true });
   }
 
-  const { run, promptCount } = created;
-  const credits = citationRunCredits(promptCount);
+  const { run, promptCount, platformCount } = created;
+  const credits = citationRunCredits(promptCount, platformCount);
   const debit = await debitForRun(ctx.teamId, run.id, credits);
   if (!debit.applied) {
     await deleteRunRow(run.id);

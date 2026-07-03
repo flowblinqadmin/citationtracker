@@ -17,8 +17,10 @@ import {
 } from "@/lib/db/schema";
 import type {
   TrackerCompetitor,
+  TrackerPlatform,
   TrackerPromptCategory,
   TrackerRunFrequency,
+  TrackerRunScope,
 } from "@/lib/types/tracker";
 import { and, asc, desc, eq, gte, inArray, like } from "drizzle-orm";
 import { nanoid } from "nanoid";
@@ -262,23 +264,85 @@ export async function listRuns(teamId: string, clientId: string): Promise<Tracke
 }
 
 export type ManualRunResult =
-  | { kind: "run"; run: TrackerRun; promptCount: number }
+  | { kind: "run"; run: TrackerRun; promptCount: number; platformCount: number }
   | { kind: "in_flight"; run: TrackerRun }
   | { kind: "no_prompts" }
+  | { kind: "invalid_scope"; message: string }
   | { kind: "not_found" };
+
+const ALL_PLATFORMS: TrackerPlatform[] = ["openai", "perplexity", "google"];
+
+/** Prompt subset (by prompt identity) and/or platform subset for a manual run. */
+export interface ManualRunScopeInput {
+  promptIds?: string[];
+  platforms?: TrackerPlatform[];
+}
 
 /**
  * Insert the manual run row (kind='manual', pending). The caller debits
  * credits BEFORE triggering geo's worker; on debit failure it deletes this row.
  * The in-flight check is a fast-path — the debit's unique ledger reference is
  * the real double-submit gate.
+ *
+ * `scopeInput` narrows the run to specific prompts and/or platforms. Prompt
+ * ids are resolved to their LATEST version ids here (geo's runner filters its
+ * worklist by run.scope.promptVersionIds); a full selection normalizes to a
+ * NULL scope so unscoped runs stay byte-identical to geo's own.
  */
-export async function createManualRunRow(teamId: string, clientId: string): Promise<ManualRunResult> {
+export async function createManualRunRow(
+  teamId: string,
+  clientId: string,
+  scopeInput?: ManualRunScopeInput,
+): Promise<ManualRunResult> {
   const brand = await getBrand(teamId, clientId);
   if (!brand) return { kind: "not_found" };
 
-  const promptCount = await countActivePrompts(clientId);
-  if (promptCount === 0) return { kind: "no_prompts" };
+  const activePrompts = await db
+    .select({ id: trackerPrompts.id })
+    .from(trackerPrompts)
+    .where(and(eq(trackerPrompts.clientId, clientId), eq(trackerPrompts.status, "active")));
+  if (activePrompts.length === 0) return { kind: "no_prompts" };
+
+  // Platforms: dedupe, validate, and drop the filter when it isn't narrowing.
+  let platforms: TrackerPlatform[] | undefined;
+  if (scopeInput?.platforms?.length) {
+    const unique = [...new Set(scopeInput.platforms)];
+    const unknown = unique.filter((p) => !ALL_PLATFORMS.includes(p));
+    if (unknown.length > 0) {
+      return { kind: "invalid_scope", message: `Unknown platforms: ${unknown.join(", ")}` };
+    }
+    if (unique.length < ALL_PLATFORMS.length) platforms = unique;
+  }
+
+  // Prompts: every id must be one of this brand's active prompts.
+  let promptVersionIds: string[] | undefined;
+  let promptCount = activePrompts.length;
+  if (scopeInput?.promptIds?.length) {
+    const activeIds = new Set(activePrompts.map((p) => p.id));
+    const selected = [...new Set(scopeInput.promptIds)];
+    const invalid = selected.filter((id) => !activeIds.has(id));
+    if (invalid.length > 0) {
+      return { kind: "invalid_scope", message: `Not active prompts of this brand: ${invalid.join(", ")}` };
+    }
+    if (selected.length < activePrompts.length) {
+      const versions = await db
+        .select({ id: trackerPromptVersions.id, promptId: trackerPromptVersions.promptId, version: trackerPromptVersions.version })
+        .from(trackerPromptVersions)
+        .where(inArray(trackerPromptVersions.promptId, selected))
+        .orderBy(desc(trackerPromptVersions.version));
+      const latest = new Map<string, string>();
+      for (const v of versions) {
+        if (!latest.has(v.promptId)) latest.set(v.promptId, v.id);
+      }
+      promptVersionIds = selected.map((id) => latest.get(id)!).filter(Boolean);
+      promptCount = promptVersionIds.length;
+    }
+  }
+
+  const scope: TrackerRunScope | null =
+    promptVersionIds || platforms
+      ? { ...(promptVersionIds ? { promptVersionIds } : {}), ...(platforms ? { platforms } : {}) }
+      : null;
 
   const [inflight] = await db
     .select()
@@ -297,9 +361,10 @@ export async function createManualRunRow(teamId: string, clientId: string): Prom
       period: currentPeriod(),
       kind: "manual",
       promptsTotal: promptCount,
+      scope,
     })
     .returning();
-  return { kind: "run", run, promptCount };
+  return { kind: "run", run, promptCount, platformCount: platforms?.length ?? ALL_PLATFORMS.length };
 }
 
 export async function markRunFailed(runId: string, error: string): Promise<void> {
