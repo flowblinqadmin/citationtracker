@@ -24,12 +24,9 @@ function isValid(secret: string | undefined): secret is string {
   return typeof secret === "string" && secret.length >= MIN_LEN;
 }
 
-// Module-load assertion. Production boots fail loudly on misconfig.
-if (!isValid(process.env.CRON_SECRET)) {
-  throw new Error(
-    `CRON_SECRET env var is required and must be at least ${MIN_LEN} characters`,
-  );
-}
+// No module-load assertion here: Next evaluates route modules during build,
+// where env vars are absent. assertCronAuth/getCronSecret fail closed at
+// request time instead (503 on misconfig).
 
 /**
  * Returns the current CRON_SECRET. Re-reads process.env on each call so

@@ -3,8 +3,9 @@
 // prod with a read-only role for the pre-deploy check). Catches geo migrations
 // that changed a shared table without this repo mirroring the change.
 import { describe, it, expect } from "vitest";
-import { getTableColumns } from "drizzle-orm";
 import { getTableConfig } from "drizzle-orm/pg-core";
+import { getTableColumns, sql } from "drizzle-orm";
+import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 
 const dbUrl = process.env.TEST_DATABASE_URL;
@@ -25,8 +26,6 @@ const MIRRORED_TABLES = [
 
 describe.skipIf(!dbUrl)("schema drift (mirror vs information_schema)", () => {
   it("every declared column exists in the DB with matching nullability", async () => {
-    const { db } = await import("@/lib/db");
-    const { sql } = await import("drizzle-orm");
 
     const problems: string[] = [];
 

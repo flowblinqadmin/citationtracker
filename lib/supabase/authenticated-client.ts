@@ -1,37 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
 import { headers } from "next/headers";
-import { NextResponse } from "next/server";
-
-/**
- * Creates a Supabase client using the JWT forwarded from middleware.
- * Eliminates the need for duplicate auth.getUser() calls.
- *
- * @returns Object containing authenticated Supabase client, userId, and token
- * @throws Error if no authentication token is found in headers
- */
-export async function createAuthenticatedClient() {
-  const headersList = await headers();
-  const token = headersList.get("x-supabase-token");
-  const userId = headersList.get("x-user-id");
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    }
-  );
-
-  return { supabase, userId, token };
-}
 
 /**
  * Gets authenticated user information from forwarded headers.
@@ -83,28 +50,3 @@ export async function getAuthenticatedUser() {
   }
 }
 
-/**
- * Higher-order function that wraps API route handlers with authentication.
- * Automatically checks for authenticated user and passes user info to handler.
- *
- * @example
- * export const GET = withAuth(async (request, user) => {
- *   const { supabase } = await createAuthenticatedClient();
- *   return NextResponse.json({ data: "success" });
- * });
- */
-export function withAuth<T extends unknown[]>(
-  handler: (
-    ...args: [...T, { id: string; email: string | null; token: string; tokenExpiry: Date | null }]
-  ) => Promise<NextResponse>
-) {
-  return async (...args: T): Promise<NextResponse> => {
-    const user = await getAuthenticatedUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    return handler(...args, user);
-  };
-}

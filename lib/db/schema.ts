@@ -34,7 +34,6 @@ export const teams = pgTable("teams", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export type Team = typeof teams.$inferSelect;
 
 // ── public.team_members — geo team membership (user → team resolution) ──────
 export const teamMembers = pgTable("team_members", {
@@ -46,7 +45,6 @@ export const teamMembers = pgTable("team_members", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export type TeamMember = typeof teamMembers.$inferSelect;
 
 // ── public.credit_transactions — geo's append-only credit ledger ────────────
 // This service writes types citation_run / citation_run_refund /
@@ -68,7 +66,6 @@ export const creditTransactions = pgTable("credit_transactions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export type CreditTransaction = typeof creditTransactions.$inferSelect;
 
 // ── public.rate_limits — DB-backed rate limiter (shared with geo) ───────────
 export const rateLimits = pgTable("rate_limits", {
@@ -82,7 +79,7 @@ export const rateLimits = pgTable("rate_limits", {
 // This service stores its data here, scoped to one org per geo team
 // (id `team_<teamId>`, NO tracker.members rows — see CLAUDE.md geo contract).
 // ─────────────────────────────────────────────────────────────────────────────
-export const trackerSchema = pgSchema("tracker");
+const trackerSchema = pgSchema("tracker");
 
 export const trackerOrgs = trackerSchema.table("orgs", {
   id: text("id").primaryKey(),
@@ -92,7 +89,6 @@ export const trackerOrgs = trackerSchema.table("orgs", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export type TrackerOrg = typeof trackerOrgs.$inferSelect;
 
 export const trackerClients = trackerSchema.table("clients", {
   id: text("id").primaryKey(),
@@ -120,7 +116,6 @@ export const trackerPrompts = trackerSchema.table("prompts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export type TrackerPrompt = typeof trackerPrompts.$inferSelect;
 
 export const trackerPromptVersions = trackerSchema.table("prompt_versions", {
   id: text("id").primaryKey(),
@@ -131,7 +126,6 @@ export const trackerPromptVersions = trackerSchema.table("prompt_versions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export type TrackerPromptVersion = typeof trackerPromptVersions.$inferSelect;
 
 export const trackerRuns = trackerSchema.table("runs", {
   id: text("id").primaryKey(),
@@ -169,7 +163,6 @@ export const trackerResponses = trackerSchema.table("responses", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export type TrackerResponse = typeof trackerResponses.$inferSelect;
 
 export const trackerCitations = trackerSchema.table("citations", {
   id: text("id").primaryKey(),
@@ -189,4 +182,3 @@ export const trackerCitations = trackerSchema.table("citations", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export type TrackerCitation = typeof trackerCitations.$inferSelect;

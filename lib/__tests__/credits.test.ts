@@ -11,7 +11,13 @@ import {
   CITATION_EXEC_PRICE_USD,
   CREDIT_USD,
   citationRunCredits,
+  debitForRun,
+  refundForRun,
+  redebitForRun,
 } from "@/lib/credits";
+import { db } from "@/lib/db";
+import { teams, creditTransactions } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 describe("citationRunCredits", () => {
   it("prices a prompt-execution at the most expensive model × margin", () => {
@@ -51,25 +57,11 @@ describe("citationRunCredits", () => {
 const dbUrl = process.env.TEST_DATABASE_URL;
 
 describe.skipIf(!dbUrl)("ledger (Postgres)", () => {
-  // Imported lazily so the pure tests run without a DB.
-  let debitForRun: typeof import("@/lib/credits").debitForRun;
-  let refundForRun: typeof import("@/lib/credits").refundForRun;
-  let redebitForRun: typeof import("@/lib/credits").redebitForRun;
-  let db: typeof import("@/lib/db").db;
-  let teams: typeof import("@/lib/db/schema").teams;
-  let creditTransactions: typeof import("@/lib/db/schema").creditTransactions;
-  let eq: typeof import("drizzle-orm").eq;
-
   const TEAM = "team_credits_test";
   let runSeq = 0;
   const newRunId = () => `tr_test_${Date.now()}_${runSeq++}`;
 
   beforeEach(async () => {
-    ({ debitForRun, refundForRun, redebitForRun } = await import("@/lib/credits"));
-    ({ db } = await import("@/lib/db"));
-    ({ teams, creditTransactions } = await import("@/lib/db/schema"));
-    ({ eq } = await import("drizzle-orm"));
-
     await db.delete(creditTransactions).where(eq(creditTransactions.teamId, TEAM));
     await db.delete(teams).where(eq(teams.id, TEAM));
     await db.insert(teams).values({
