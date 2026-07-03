@@ -320,13 +320,17 @@ describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
       await cite("cit_2", "docs.acme.com", "openai");
       await cite("cit_3", "rival.com", "google");
       await cite("cit_4", "wikipedia.org", "google");
+      // Unresolved Gemini redirect — must never surface as a source.
+      await cite("cit_5", "vertexaisearch.cloud.google.com", "google");
     });
 
     it("counts totals, brand-domain (incl. subdomains), competitors, and per-reply rate", async () => {
       const runs = await tdb.listRunsWithStats(TEAM, clientId);
       const run = runs.find((r) => r.id === runId)!;
+      // totals still count the unresolved redirect (the reply DID cite
+      // something); only the top-domains list hides it.
       expect(run.citationStats).toEqual({
-        totalCitations: 4,
+        totalCitations: 5,
         brandCitations: 2,
         competitorCitations: 1,
         // 1 of 2 answered (promptVersion × platform) pairs has a brand citation
@@ -340,15 +344,16 @@ describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
       const run = runs.find((r) => r.id === runId)!;
       expect(run.citationStats.brandCitationRate).toBeNull();
       expect(run.citationStats.brandCitations).toBe(0);
-      expect(run.citationStats.totalCitations).toBe(4);
+      expect(run.citationStats.totalCitations).toBe(5);
     });
 
-    it("lists a run's top cited domains", async () => {
+    it("lists a run's top cited domains, excluding unresolved redirect hosts", async () => {
       const top = await tdb.getRunTopDomains(TEAM, clientId, runId);
       expect(top[0]).toEqual({ domain: "acme.com", count: 1, brand: true });
-      expect(top).toHaveLength(4);
+      expect(top).toHaveLength(4); // cit_5's vertexaisearch host is filtered out
       expect(top.find((d) => d.domain === "docs.acme.com")?.brand).toBe(true);
       expect(top.find((d) => d.domain === "wikipedia.org")?.brand).toBe(false);
+      expect(top.some((d) => d.domain.includes("vertexaisearch"))).toBe(false);
     });
 
     it("cross-org: stats and domains are empty for a foreign team", async () => {

@@ -346,6 +346,11 @@ export interface TopDomain {
   brand: boolean;
 }
 
+// Gemini grounding returns vertexaisearch redirect URLs; geo resolves them
+// before storing citations.domain, but if resolution ever fails the redirect
+// host falls through — those links die, so never surface them as sources.
+const REDIRECT_HOSTS = ["vertexaisearch.cloud.google.com"];
+
 /** A run's most-cited domains, brand-flagged, most-cited first. */
 export async function getRunTopDomains(
   teamId: string,
@@ -367,7 +372,7 @@ export async function getRunTopDomains(
     .orderBy(sql`count(*) desc`, asc(trackerCitations.domain))
     .limit(limit);
   return rows
-    .filter((r) => r.domain !== "")
+    .filter((r) => r.domain !== "" && !REDIRECT_HOSTS.includes(r.domain))
     .map((r) => ({
       ...r,
       brand: !!brandDomain && (r.domain === brandDomain || r.domain.endsWith(`.${brandDomain}`)),
