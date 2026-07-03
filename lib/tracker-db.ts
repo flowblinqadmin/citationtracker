@@ -408,6 +408,7 @@ export interface RunResponseRow {
   responseText: string | null;
   citedUrls: string[];
   brandMentioned: boolean;
+  sentiment: string | null;
   createdAt: Date | null;
 }
 
@@ -429,6 +430,7 @@ export async function listRunResponses(
       responseText: trackerResponses.responseText,
       citedUrls: trackerResponses.citedUrls,
       brandMentioned: trackerResponses.brandMentioned,
+      sentiment: trackerResponses.sentiment,
       createdAt: trackerResponses.createdAt,
     })
     .from(trackerResponses)
@@ -451,6 +453,7 @@ export interface PromptHistoryRow {
   responseText: string | null;
   citedUrls: string[];
   brandMentioned: boolean;
+  sentiment: string | null;
 }
 
 /**
@@ -482,6 +485,7 @@ export async function listPromptHistory(
       responseText: trackerResponses.responseText,
       citedUrls: trackerResponses.citedUrls,
       brandMentioned: trackerResponses.brandMentioned,
+      sentiment: trackerResponses.sentiment,
     })
     .from(trackerResponses)
     .innerJoin(trackerPromptVersions, eq(trackerResponses.promptVersionId, trackerPromptVersions.id))

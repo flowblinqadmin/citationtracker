@@ -37,6 +37,7 @@ interface Run {
   completedAt: string | null;
   error: string | null;
   metrics: TrackerRunMetrics | null;
+  scope: { promptVersionIds?: string[]; platforms?: string[] } | null;
 }
 
 const CARD = "#ffffff";
@@ -57,6 +58,7 @@ interface ReplyRow {
   responseText: string | null;
   citedUrls: string[];
   brandMentioned: boolean;
+  sentiment: string | null;
 }
 
 interface HistoryRow {
@@ -69,10 +71,110 @@ interface HistoryRow {
   attempt: number;
   responseText: string | null;
   brandMentioned: boolean;
+  sentiment: string | null;
 }
 
 const PLATFORM_LABEL: Record<string, string> = { openai: "ChatGPT", perplexity: "Perplexity", google: "Gemini" };
 const PLATFORM_ORDER = ["openai", "perplexity", "google"];
+
+const SENTIMENT_STYLE: Record<string, { color: string; bg: string; label: string }> = {
+  positive: { color: GREEN, bg: "#f0fdf4", label: "positive" },
+  negative: { color: RED, bg: "#fef2f2", label: "negative" },
+  neutral: { color: MUTED, bg: "#f5f5f4", label: "neutral" },
+};
+
+function SentimentChip({ sentiment }: { sentiment: string | null }) {
+  const s = sentiment ? SENTIMENT_STYLE[sentiment] : undefined;
+  if (!s) return null;
+  return (
+    <span style={{ color: s.color, background: s.bg, border: BORDER, borderRadius: 999, padding: "1px 8px", fontWeight: 600 }}>
+      {s.label}
+    </span>
+  );
+}
+
+/**
+ * One prompt×platform counts once — attempt 2 (geo's re-run-once rule)
+ * supersedes attempt 1 in the tallies.
+ */
+function finalAttempts(rows: ReplyRow[]): ReplyRow[] {
+  const byKey = new Map<string, ReplyRow>();
+  for (const r of rows) {
+    const key = `${r.promptText}|${r.platform}`;
+    const prev = byKey.get(key);
+    if (!prev || r.attempt > prev.attempt) byKey.set(key, r);
+  }
+  return [...byKey.values()];
+}
+
+interface SentimentCounts {
+  positive: number;
+  neutral: number;
+  negative: number;
+  unclassified: number;
+}
+
+function tallySentiment(finals: ReplyRow[]): SentimentCounts {
+  const counts: SentimentCounts = { positive: 0, neutral: 0, negative: 0, unclassified: 0 };
+  for (const r of finals) {
+    if (r.sentiment === "positive" || r.sentiment === "neutral" || r.sentiment === "negative") counts[r.sentiment]++;
+    else if (r.brandMentioned) counts.unclassified++;
+  }
+  return counts;
+}
+
+function SentimentSplit({ counts }: { counts: SentimentCounts }) {
+  return (
+    <>
+      {(["positive", "neutral", "negative"] as const).map((k) =>
+        counts[k] > 0 ? (
+          <span key={k} style={{ color: SENTIMENT_STYLE[k].color, fontWeight: 600 }}>
+            {counts[k]} {k}
+          </span>
+        ) : null,
+      )}
+      {counts.unclassified > 0 && <span style={{ color: MUTED }}>{counts.unclassified} unclassified</span>}
+    </>
+  );
+}
+
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  if (values.length < 2) return <span style={{ color: MUTED, fontSize: 12 }}>needs 2+ runs</span>;
+  const w = 180;
+  const h = 44;
+  const pts = values.map((v, i) => `${(i / (values.length - 1)) * (w - 4) + 2},${h - 2 - v * (h - 8)}`).join(" ");
+  return (
+    <svg width={w} height={h} role="img" aria-label="trend">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function MetricCard({ label, value, sub }: { label: string; value: string; sub?: React.ReactNode }) {
+  return (
+    <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px", flex: "1 1 150px" }}>
+      <div style={{ fontSize: 12, color: MUTED }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 700, margin: "4px 0" }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: MUTED }}>{sub}</div>}
+    </div>
+  );
+}
+
+/** The run at a glance — nobody reads every reply. */
+function RunDigest({ rows }: { rows: ReplyRow[] }) {
+  const finals = finalAttempts(rows);
+  if (finals.length === 0) return null;
+  const mentioned = finals.filter((r) => r.brandMentioned).length;
+  const counts = tallySentiment(finals);
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 14, background: "#fff7ed", border: BORDER, borderRadius: 8, padding: "8px 12px", fontSize: 12, marginTop: 10 }}>
+      <span>
+        <strong>{mentioned}</strong> of {finals.length} replies mention the brand
+      </span>
+      <SentimentSplit counts={counts} />
+    </div>
+  );
+}
 
 const REPLY_PREVIEW_CHARS = 280;
 
@@ -112,7 +214,7 @@ function previewSlice(text: string): string {
   return `${cut}…`;
 }
 
-function ReplyText({ text, mentioned }: { text: string | null; mentioned: boolean }) {
+function ReplyText({ text, mentioned, sentiment }: { text: string | null; mentioned: boolean; sentiment?: string | null }) {
   const [expanded, setExpanded] = useState(false);
   const long = (text?.length ?? 0) > REPLY_PREVIEW_CHARS;
   const shown = !text ? null : expanded || !long ? text : previewSlice(text);
@@ -123,8 +225,9 @@ function ReplyText({ text, mentioned }: { text: string | null; mentioned: boolea
       ) : (
         <ReactMarkdown components={MD_COMPONENTS}>{shown}</ReactMarkdown>
       )}
-      <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 6, fontSize: 11 }}>
         {mentioned && <span style={{ color: GREEN, fontWeight: 600 }}>✓ brand mentioned</span>}
+        <SentimentChip sentiment={sentiment ?? null} />
         {long && (
           <button
             onClick={() => setExpanded((v) => !v)}
@@ -143,10 +246,11 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
   const [balance, setBalance] = useState<number | null>(null);
-  const [tab, setTab] = useState<"prompts" | "runs">("prompts");
+  const [tab, setTab] = useState<"overview" | "prompts" | "runs">("overview");
   const [showLibrary, setShowLibrary] = useState(false);
   const [customText, setCustomText] = useState("");
   const [running, setRunning] = useState(false);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(PLATFORM_ORDER);
   const [notFound, setNotFound] = useState(false);
   const [openRunId, setOpenRunId] = useState<string | null>(null);
   const [replies, setReplies] = useState<Record<string, ReplyRow[]>>({});
@@ -191,8 +295,15 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
     return () => clearInterval(t);
   }, [hasActiveRun, clientId, load]);
 
-  const runCost = prompts.length > 0 ? citationRunCredits(prompts.length) : 0;
+  const runCost = prompts.length > 0 ? citationRunCredits(prompts.length, selectedPlatforms.length) : 0;
+  const singleCost = citationRunCredits(1, selectedPlatforms.length);
   const inLibrary = new Set(prompts.map((p) => p.name));
+
+  function togglePlatform(p: string) {
+    setSelectedPlatforms((cur) =>
+      cur.includes(p) ? (cur.length > 1 ? cur.filter((x) => x !== p) : cur) : [...cur, p],
+    );
+  }
 
   async function addPrompt(name: string, category: TrackerPromptCategory, text: string) {
     const res = await fetch(apiUrl(`/api/brands/${clientId}/prompts`), {
@@ -238,6 +349,19 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
     }
   }
 
+  // Overview needs the latest complete run's replies for the sentiment split.
+  const latestComplete = runs.find((r) => r.status === "complete" && r.metrics) ?? null;
+  const latestCompleteId = latestComplete?.id ?? null;
+  useEffect(() => {
+    if (tab !== "overview" || !latestCompleteId || replies[latestCompleteId]) return;
+    void fetch(apiUrl(`/api/brands/${clientId}/runs/${latestCompleteId}/responses`)).then(async (res) => {
+      if (res.ok) {
+        const body = await res.json();
+        setReplies((m) => ({ ...m, [latestCompleteId]: body.responses }));
+      }
+    });
+  }, [tab, latestCompleteId, clientId, replies]);
+
   async function toggleReplies(runId: string) {
     if (openRunId === runId) {
       setOpenRunId(null);
@@ -268,10 +392,18 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
     }
   }
 
-  async function runNow() {
+  async function runNow(promptIds?: string[]) {
     setRunning(true);
     try {
-      const res = await fetch(apiUrl(`/api/brands/${clientId}/run`), { method: "POST" });
+      const scope: { promptIds?: string[]; platforms?: string[] } = {};
+      if (promptIds?.length) scope.promptIds = promptIds;
+      if (selectedPlatforms.length < PLATFORM_ORDER.length) scope.platforms = selectedPlatforms;
+      const res = await fetch(apiUrl(`/api/brands/${clientId}/run`), {
+        method: "POST",
+        ...(Object.keys(scope).length > 0
+          ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(scope) }
+          : {}),
+      });
       const body = await res.json();
       if (res.status === 402) {
         toast.error(
@@ -314,6 +446,20 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
           {brand?.domain && <span style={{ color: MUTED, fontSize: 13 }}>{brand.domain}</span>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", gap: 4 }} title="Models the next manual run queries">
+            {PLATFORM_ORDER.map((p) => {
+              const on = selectedPlatforms.includes(p);
+              return (
+                <button
+                  key={p}
+                  onClick={() => togglePlatform(p)}
+                  style={{ padding: "5px 10px", background: on ? "#fff7ed" : CARD, border: on ? `1px solid ${ACCENT}` : BORDER, borderRadius: 999, fontSize: 12, cursor: "pointer", color: on ? ACCENT : MUTED, fontWeight: on ? 600 : 400 }}
+                >
+                  {PLATFORM_LABEL[p]}
+                </button>
+              );
+            })}
+          </div>
           <label style={{ fontSize: 13, color: MUTED }}>
             Frequency{" "}
             <select
@@ -345,16 +491,106 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
       )}
 
       <nav style={{ display: "flex", gap: 16, borderBottom: BORDER, margin: "16px 0" }}>
-        {(["prompts", "runs"] as const).map((t) => (
+        {(["overview", "prompts", "runs"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             style={{ padding: "8px 2px", background: "none", border: "none", borderBottom: tab === t ? `2px solid ${ACCENT}` : "2px solid transparent", fontSize: 14, cursor: "pointer", color: tab === t ? "inherit" : MUTED }}
           >
-            {t === "prompts" ? `Prompts (${prompts.length}/30)` : `Runs (${runs.length})`}
+            {t === "overview" ? "Overview" : t === "prompts" ? `Prompts (${prompts.length}/30)` : `Runs (${runs.length})`}
           </button>
         ))}
       </nav>
+
+      {tab === "overview" && (
+        <section>
+          {!latestComplete ? (
+            <p style={{ color: MUTED, fontSize: 14 }}>
+              No completed runs yet — add prompts and run them to see the dashboard.
+            </p>
+          ) : (
+            (() => {
+              const m = latestComplete.metrics!;
+              const trend = [...runs].filter((r) => r.status === "complete" && r.metrics).reverse();
+              const latestReplies = replies[latestComplete.id];
+              const sentimentCounts = latestReplies ? tallySentiment(finalAttempts(latestReplies)) : null;
+              return (
+                <div style={{ display: "grid", gap: 12 }}>
+                  <div style={{ fontSize: 12, color: MUTED }}>
+                    Latest complete run · {latestComplete.period} · {latestComplete.promptsTotal ?? "?"} prompt{latestComplete.promptsTotal === 1 ? "" : "s"}
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                    <MetricCard label="Citation rate" value={pct(m.citationRate)} sub="prompts citing your pages" />
+                    <MetricCard label="Brand mentions" value={pct(m.brandMentionRate)} sub="replies naming the brand" />
+                    <MetricCard label="Share of AI voice" value={m.shareOfAiVoice != null ? pct(m.shareOfAiVoice) : "—"} sub="vs named competitors" />
+                    <MetricCard label="Citations" value={String(m.totalCitations)} sub="URLs cited in replies" />
+                  </div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                    <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px", flex: "1 1 220px" }}>
+                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Brand sentiment (latest run)</div>
+                      {sentimentCounts ? (
+                        <div style={{ display: "flex", gap: 14, fontSize: 14, flexWrap: "wrap" }}>
+                          <SentimentSplit counts={sentimentCounts} />
+                          {sentimentCounts.positive + sentimentCounts.neutral + sentimentCounts.negative + sentimentCounts.unclassified === 0 && (
+                            <span style={{ color: MUTED, fontSize: 12 }}>brand not mentioned in any reply</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ color: MUTED, fontSize: 12 }}>loading…</span>
+                      )}
+                    </div>
+                    <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px", flex: "1 1 220px" }}>
+                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Citation-rate trend ({trend.length} runs)</div>
+                      <Sparkline values={trend.map((r) => r.metrics!.citationRate)} color={ACCENT} />
+                    </div>
+                  </div>
+
+                  {m.platformBreakdown?.length > 0 && (
+                    <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
+                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>By platform (latest run)</div>
+                      <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr style={{ color: MUTED, textAlign: "left" }}>
+                            <th style={{ fontWeight: 400, paddingBottom: 6 }}>Platform</th>
+                            <th style={{ fontWeight: 400 }}>Citation rate</th>
+                            <th style={{ fontWeight: 400 }}>Brand mentions</th>
+                            <th style={{ fontWeight: 400 }}>Citations</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {m.platformBreakdown.map((p) => (
+                            <tr key={p.platform} style={{ borderTop: BORDER }}>
+                              <td style={{ padding: "6px 0" }}>{PLATFORM_LABEL[p.platform] ?? p.platform}</td>
+                              <td><strong>{pct(p.citationRate)}</strong></td>
+                              <td>{pct(p.brandMentionRate)}</td>
+                              <td>{p.totalCitations}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {m.competitorMetrics?.length > 0 && (
+                    <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
+                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Competitors cited (latest run)</div>
+                      <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
+                        {m.competitorMetrics.map((c) => (
+                          <div key={c.domain} style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span>{c.name} <span style={{ color: MUTED }}>({c.domain})</span></span>
+                            <span><strong>{c.totalCitations}</strong> citations · {pct(c.citationRate)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          )}
+        </section>
+      )}
 
       {tab === "prompts" && (
         <section>
@@ -424,6 +660,14 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, fontSize: 12 }}>
+                  <button
+                    onClick={() => void runNow([p.promptId])}
+                    disabled={running || hasActiveRun}
+                    title={`Run just this prompt on ${selectedPlatforms.map((x) => PLATFORM_LABEL[x]).join(", ")}`}
+                    style={{ background: "none", border: BORDER, borderRadius: 999, padding: "3px 10px", color: ACCENT, cursor: "pointer", fontWeight: 600, opacity: running || hasActiveRun ? 0.5 : 1 }}
+                  >
+                    Run · {singleCost} cr
+                  </button>
                   <button onClick={() => void toggleHistory(p.promptId)} style={{ background: "none", border: "none", color: ACCENT, cursor: "pointer" }}>
                     {historyPromptId === p.promptId ? "Hide history" : "History"}
                   </button>
@@ -450,7 +694,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                           <span style={{ marginLeft: 6, padding: "1px 6px", background: "#fff7ed", border: BORDER, borderRadius: 999 }}>v{h.version}</span>
                         )}
                       </div>
-                      <ReplyText text={h.responseText} mentioned={h.brandMentioned} />
+                      <ReplyText text={h.responseText} mentioned={h.brandMentioned} sentiment={h.sentiment} />
                     </div>
                   ))}
                 </div>
@@ -471,7 +715,12 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <div style={{ fontSize: 14 }}>
                   <strong>{r.period}</strong>
-                  <span style={{ color: MUTED, marginLeft: 8, fontSize: 12 }}>{r.kind} · {r.promptsTotal ?? "?"} prompts</span>
+                  <span style={{ color: MUTED, marginLeft: 8, fontSize: 12 }}>
+                    {r.kind} · {r.promptsTotal ?? "?"} prompt{r.promptsTotal === 1 ? "" : "s"}
+                    {r.scope?.platforms?.length
+                      ? ` · ${r.scope.platforms.map((p) => PLATFORM_LABEL[p] ?? p).join(" + ")}`
+                      : ""}
+                  </span>
                 </div>
                 <span style={{ fontSize: 12, fontWeight: 600, color: r.status === "complete" ? GREEN : r.status === "failed" ? RED : ACCENT }}>
                   {r.status}
@@ -496,6 +745,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
               )}
               {openRunId === r.id && replies[r.id] && (
                 <div style={{ marginTop: 10, display: "grid", gap: 12 }}>
+                  <RunDigest rows={replies[r.id]} />
                   {[...replies[r.id]]
                     .sort((a, b) =>
                       a.promptText === b.promptText
@@ -512,7 +762,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                         {resp.model ? ` · ${resp.model}` : ""}
                         {resp.attempt > 1 ? ` · attempt ${resp.attempt}` : ""}
                       </div>
-                      <ReplyText text={resp.responseText} mentioned={resp.brandMentioned} />
+                      <ReplyText text={resp.responseText} mentioned={resp.brandMentioned} sentiment={resp.sentiment} />
                     </div>
                   ))}
                 </div>
