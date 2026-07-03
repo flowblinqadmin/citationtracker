@@ -335,6 +335,9 @@ export async function createManualRunRow(
         if (!latest.has(v.promptId)) latest.set(v.promptId, v.id);
       }
       promptVersionIds = selected.map((id) => latest.get(id)!).filter(Boolean);
+      if (promptVersionIds.length === 0) {
+        return { kind: "invalid_scope", message: "Selected prompts have no versions" };
+      }
       promptCount = promptVersionIds.length;
     }
   }

@@ -40,9 +40,15 @@ https://geo.flowblinq.com) and its database. Verified against prod 2026-07-03.
 1. **Execution**: `POST {GEO_ORIGIN}/api/tracker/worker` with
    `Authorization: Bearer <CRON_SECRET>` (same secret as geo's Vercel env) and
    body `{runId, clientId, cursor: 0}`. Geo's runner rebuilds the worklist from
-   the DB (active prompt versions × 3 platforms), executes, persists
-   responses/citations, stores metrics on the run row, and self-resumes long
-   runs via geo's QStash.
+   the DB (active prompt versions × 3 platforms), FILTERED by `runs.scope`
+   ({promptVersionIds?, platforms?}, NULL = full — geo migration
+   20260703-tracker-run-scope-sentiment; empty/unknown scope values fall back
+   to full, never empty). It executes, persists responses/citations (with
+   `responses.sentiment` classified via Gemini for team_* orgs when the brand
+   is mentioned), stores metrics on the run row, and self-resumes long runs
+   via geo's QStash. Scoped runs REQUIRE that geo deploy to be live — an old
+   runner ignores scope and executes the full worklist while we billed a
+   subset.
 2. **Scheduling**: geo's hourly cron (`/api/cron/tracker-run`) auto-creates and
    enqueues scheduled runs for ANY `tracker.clients` row with
    `run_frequency != 'manual'` and a due `next_run_at`, and recovers stale runs.
@@ -62,8 +68,10 @@ https://geo.flowblinq.com) and its database. Verified against prod 2026-07-03.
 ## Credits & pricing
 
 - Flat price per prompt-execution = most-expensive-model cost × 1.3, in geo
-  credits (1 credit = $0.10). Constants in `lib/config.ts`
-  (`MODEL_COST_ESTIMATES` — review quarterly against provider pricing).
+  credits (1 credit = $0.10), × the SELECTED platform count (runs can scope to
+  a subset of prompts/platforms; 1 prompt × 1 model = 1 credit, 30 × 3 = 12).
+  Constants in `lib/pricing.ts` (`MODEL_COST_ESTIMATES` — review quarterly
+  against provider pricing).
 - Manual runs debit upfront (402 gate). Scheduled runs are debited post-hoc by
   `/api/cron/reconcile` (balance may go negative → manual runs blocked).
   Failed runs refunded; revived-after-refund runs re-debited.

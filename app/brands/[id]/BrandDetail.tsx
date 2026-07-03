@@ -246,7 +246,9 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
   const [balance, setBalance] = useState<number | null>(null);
-  const [tab, setTab] = useState<"overview" | "prompts" | "runs">("overview");
+  // null until the first load decides: Overview when there's a completed run
+  // to show, otherwise straight to prompt setup.
+  const [tab, setTab] = useState<"overview" | "prompts" | "runs" | null>(null);
   const [showLibrary, setShowLibrary] = useState(false);
   const [customText, setCustomText] = useState("");
   const [running, setRunning] = useState(false);
@@ -270,7 +272,11 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
     }
     if (brandRes.ok) setBrand((await brandRes.json()).brand);
     if (promptsRes.ok) setPrompts((await promptsRes.json()).prompts);
-    if (runsRes.ok) setRuns((await runsRes.json()).runs);
+    if (runsRes.ok) {
+      const { runs: fresh } = (await runsRes.json()) as { runs: Run[] };
+      setRuns(fresh);
+      setTab((t) => t ?? (fresh.some((r) => r.status === "complete" && r.metrics) ? "overview" : "prompts"));
+    }
     if (teamRes.ok) setBalance((await teamRes.json()).creditBalance);
   }, [clientId]);
 
