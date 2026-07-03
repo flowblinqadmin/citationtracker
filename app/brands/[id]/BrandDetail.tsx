@@ -71,12 +71,31 @@ interface HistoryRow {
 }
 
 const PLATFORM_LABEL: Record<string, string> = { openai: "ChatGPT", perplexity: "Perplexity", google: "Gemini" };
+const PLATFORM_ORDER = ["openai", "perplexity", "google"];
 
+const REPLY_PREVIEW_CHARS = 280;
+
+// Collapsed preview + expand-in-place. Deliberately NO inner scrollbars —
+// a fixed-height scrollable box traps the wheel and hides the platforms
+// below it, which reads as "the other replies are missing".
 function ReplyText({ text, mentioned }: { text: string | null; mentioned: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const long = (text?.length ?? 0) > REPLY_PREVIEW_CHARS;
+  const shown = !text ? null : expanded || !long ? text : `${text.slice(0, REPLY_PREVIEW_CHARS).trimEnd()}…`;
   return (
-    <div style={{ whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.5, maxHeight: 220, overflowY: "auto", background: "#fafaf9", border: BORDER, borderRadius: 8, padding: "10px 12px" }}>
-      {text ?? <em style={{ color: MUTED }}>no response captured</em>}
-      {mentioned && <div style={{ marginTop: 6, fontSize: 11, color: GREEN, fontWeight: 600 }}>✓ brand mentioned</div>}
+    <div style={{ whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.5, background: "#fafaf9", border: BORDER, borderRadius: 8, padding: "10px 12px" }}>
+      {shown ?? <em style={{ color: MUTED }}>no response captured</em>}
+      <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11 }}>
+        {mentioned && <span style={{ color: GREEN, fontWeight: 600 }}>✓ brand mentioned</span>}
+        {long && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            style={{ background: "none", border: "none", padding: 0, color: ACCENT, fontSize: 11, cursor: "pointer" }}
+          >
+            {expanded ? "Collapse" : "Show full reply"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -439,9 +458,15 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
               )}
               {openRunId === r.id && replies[r.id] && (
                 <div style={{ marginTop: 10, display: "grid", gap: 12 }}>
-                  {replies[r.id].map((resp, i) => (
+                  {[...replies[r.id]]
+                    .sort((a, b) =>
+                      a.promptText === b.promptText
+                        ? PLATFORM_ORDER.indexOf(a.platform) - PLATFORM_ORDER.indexOf(b.platform)
+                        : 0,
+                    )
+                    .map((resp, i, sorted) => (
                     <div key={i}>
-                      {(i === 0 || replies[r.id][i - 1].promptText !== resp.promptText) && (
+                      {(i === 0 || sorted[i - 1].promptText !== resp.promptText) && (
                         <div style={{ fontSize: 13, fontWeight: 600, margin: "6px 0" }}>{resp.promptText}</div>
                       )}
                       <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>
