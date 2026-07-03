@@ -23,7 +23,10 @@ async function enqueueWorker(runId: string, clientId: string): Promise<void> {
   const qstashToken = process.env.QSTASH_TOKEN;
 
   if (qstashToken) {
-    const res = await fetch(`https://qstash.upstash.io/v2/publish/${workerUrl}`, {
+    // QStash accounts are regional — QSTASH_URL (same var geo's SDK reads)
+    // must point at the account's endpoint or publishes 404.
+    const qstashBase = process.env.QSTASH_URL ?? "https://qstash.upstash.io";
+    const res = await fetch(`${qstashBase}/v2/publish/${workerUrl}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${qstashToken}`,

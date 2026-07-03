@@ -34,3 +34,4 @@ supabase/.branches/
 .playwright/
 test-results/
 playwright-report/
+.vercel
