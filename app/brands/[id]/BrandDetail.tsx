@@ -587,9 +587,14 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                       <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
                         {latestDomains.map((d) => (
                           <div key={d.domain} style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span style={{ fontWeight: d.brand ? 700 : 400, color: d.brand ? GREEN : "inherit" }}>
+                            <a
+                              href={`https://${d.domain}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontWeight: d.brand ? 700 : 400, color: d.brand ? GREEN : ACCENT }}
+                            >
                               {d.domain}{d.brand ? " · you" : ""}
-                            </span>
+                            </a>
                             <span style={{ color: MUTED }}>{d.count}×</span>
                           </div>
                         ))}
