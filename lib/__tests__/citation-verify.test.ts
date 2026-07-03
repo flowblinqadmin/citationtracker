@@ -47,6 +47,11 @@ describe("classifyPage", () => {
     expect(classifyPage(500, "text/html", "", KW).status).toBe("dead");
   });
 
+  it("unverifiable (not dead) when the site blocks bots — the page may be fine in a browser", () => {
+    expect(classifyPage(403, "text/html", "", KW).status).toBe("unverifiable");
+    expect(classifyPage(429, "text/html", "", KW).status).toBe("unverifiable");
+  });
+
   it("verified when the page mentions a brand keyword (case-insensitive)", () => {
     const r = classifyPage(200, "text/html", "<p>Why FLOWBLINQ is great</p>", KW);
     expect(r).toEqual({ status: "verified", brandMatched: true });

@@ -56,12 +56,17 @@ export interface PageVerdict {
   brandMatched?: boolean;
 }
 
+// The page exists but blocks automated fetchers — no claim either way.
+// (g2/producthunt return 403/429 to bots while opening fine in a browser.)
+const BOT_BLOCKED = new Set([401, 403, 407, 429, 451]);
+
 export function classifyPage(
   httpStatus: number,
   contentType: string | null,
   body: string,
   brandKeywords: string[],
 ): PageVerdict {
+  if (BOT_BLOCKED.has(httpStatus)) return { status: "unverifiable" };
   if (httpStatus >= 400) return { status: "dead" };
   const type = (contentType ?? "").toLowerCase();
   if (!type.includes("html") && !type.includes("text/plain")) return { status: "unverifiable" };
