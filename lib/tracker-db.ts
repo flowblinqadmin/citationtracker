@@ -14,6 +14,7 @@ import {
   trackerResponses,
   trackerCitations,
   citationChecks,
+  aiSearchSnapshots,
   type TrackerClient,
   type TrackerRun,
   type CitationCheckStatus,
@@ -520,6 +521,128 @@ export async function listRunCitationChecks(
     if (!prev || CHECK_RANK[r.status] < CHECK_RANK[prev]) map[r.url] = r.status;
   }
   return map;
+}
+
+// ── AI Search (Google AI Overview) snapshots ─────────────────────────────────
+
+export interface StaleAiSearchPrompt {
+  promptId: string;
+  clientId: string;
+  query: string;
+  keywords: string[];
+}
+
+/**
+ * Active team-org prompts whose latest AI-search snapshot is older than a day
+ * (or missing) — the hourly sweep's worklist.
+ */
+export async function listStaleAiSearchPrompts(limit: number): Promise<StaleAiSearchPrompt[]> {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const latest = db
+    .select({
+      promptId: aiSearchSnapshots.promptId,
+      lastChecked: sql<Date>`max(${aiSearchSnapshots.checkedAt})`.as("last_checked"),
+    })
+    .from(aiSearchSnapshots)
+    .groupBy(aiSearchSnapshots.promptId)
+    .as("latest");
+  const rows = await db
+    .select({
+      promptId: trackerPrompts.id,
+      clientId: trackerPrompts.clientId,
+      name: trackerClients.name,
+      domain: trackerClients.domain,
+      brandKeywords: trackerClients.brandKeywords,
+      version: trackerPromptVersions.version,
+      text: trackerPromptVersions.text,
+      lastChecked: latest.lastChecked,
+    })
+    .from(trackerPrompts)
+    .innerJoin(trackerClients, eq(trackerPrompts.clientId, trackerClients.id))
+    .innerJoin(trackerPromptVersions, eq(trackerPromptVersions.promptId, trackerPrompts.id))
+    .leftJoin(latest, eq(latest.promptId, trackerPrompts.id))
+    .where(
+      and(
+        like(trackerClients.orgId, "team\\_%"),
+        eq(trackerPrompts.status, "active"),
+        sql`(${latest.lastChecked} IS NULL OR ${latest.lastChecked} < ${cutoff.toISOString()})`,
+      ),
+    )
+    .orderBy(desc(trackerPromptVersions.version))
+    .limit(limit * 3); // multiple versions per prompt — filtered to latest below
+  const byPrompt = new Map<string, (typeof rows)[number]>();
+  for (const r of rows) {
+    if (!byPrompt.has(r.promptId)) byPrompt.set(r.promptId, r); // versions sorted desc
+  }
+  return [...byPrompt.values()].slice(0, limit).map((r) => {
+    const stem = r.domain?.replace(/^www\./, "").split(".")[0];
+    const keywords = [...new Set([...(r.brandKeywords?.keywords ?? []), r.name, stem].filter((k): k is string => !!k))];
+    return { promptId: r.promptId, clientId: r.clientId, query: r.text, keywords };
+  });
+}
+
+export interface AiSearchSnapshotInput {
+  promptId: string;
+  clientId: string;
+  query: string;
+  present: boolean;
+  brandMentioned: boolean | null;
+  overviewText: string | null;
+  citedUrls: Array<{ url: string; label: string }>;
+}
+
+export async function recordAiSearchSnapshots(snaps: AiSearchSnapshotInput[]): Promise<void> {
+  if (snaps.length === 0) return;
+  await db.insert(aiSearchSnapshots).values(
+    snaps.map((s) => ({
+      id: `ais_${nanoid()}`,
+      promptId: s.promptId,
+      clientId: s.clientId,
+      query: s.query,
+      present: s.present,
+      brandMentioned: s.brandMentioned,
+      overviewText: s.overviewText,
+      citedUrls: s.citedUrls,
+    })),
+  );
+}
+
+export interface AiSearchRow {
+  promptId: string;
+  promptText: string;
+  present: boolean;
+  brandMentioned: boolean | null;
+  citedUrls: Array<{ url: string; label: string }>;
+  checkedAt: Date | null;
+}
+
+/** Latest snapshot per active prompt for a brand (org-scoped). */
+export async function latestAiSearchForBrand(teamId: string, clientId: string): Promise<AiSearchRow[]> {
+  const brand = await getBrand(teamId, clientId);
+  if (!brand) return [];
+  const prompts = await listPrompts(teamId, clientId);
+  if (prompts.length === 0) return [];
+  const snaps = await db
+    .select()
+    .from(aiSearchSnapshots)
+    .where(and(eq(aiSearchSnapshots.clientId, clientId), inArray(aiSearchSnapshots.promptId, prompts.map((p) => p.promptId))))
+    .orderBy(desc(aiSearchSnapshots.checkedAt));
+  const latest = new Map<string, (typeof snaps)[number]>();
+  for (const s of snaps) {
+    if (!latest.has(s.promptId)) latest.set(s.promptId, s);
+  }
+  return prompts.flatMap((p) => {
+    const s = latest.get(p.promptId);
+    if (!s) return [];
+    return [{
+      promptId: p.promptId,
+      promptText: p.text,
+      present: s.present,
+      brandMentioned: s.brandMentioned,
+      citedUrls: s.citedUrls ?? [],
+      checkedAt: s.checkedAt,
+    }];
+  });
 }
 
 export type ManualRunResult =

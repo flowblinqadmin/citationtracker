@@ -416,6 +416,45 @@ describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
     });
   });
 
+  describe("AI search snapshots", () => {
+    beforeEach(async () => {
+      await db.delete(schema.aiSearchSnapshots);
+    });
+
+    it("sweep lists active TEAM prompts without a fresh snapshot; recording removes them", async () => {
+      const stale = await tdb.listStaleAiSearchPrompts(50);
+      const mine = stale.find((s) => s.promptId === promptId);
+      expect(mine).toBeTruthy();
+      expect(mine!.query).toBe("What is Acme?");
+      expect(mine!.keywords).toContain("Acme");
+
+      await tdb.recordAiSearchSnapshots([
+        {
+          promptId, clientId, query: "What is Acme?", present: true, brandMentioned: true,
+          overviewText: "Acme is…", citedUrls: [{ url: "https://acme.com/x", label: "Acme" }],
+        },
+      ]);
+      const after = await tdb.listStaleAiSearchPrompts(50);
+      expect(after.some((s) => s.promptId === promptId)).toBe(false);
+    });
+
+    it("latest snapshot per prompt is served, org-scoped", async () => {
+      await tdb.recordAiSearchSnapshots([
+        { promptId, clientId, query: "q", present: false, brandMentioned: null, overviewText: null, citedUrls: [] },
+      ]);
+      await tdb.recordAiSearchSnapshots([
+        {
+          promptId, clientId, query: "q", present: true, brandMentioned: false,
+          overviewText: "…", citedUrls: [{ url: "https://rival.com/", label: "Rival" }],
+        },
+      ]);
+      const rows = await tdb.latestAiSearchForBrand(TEAM, clientId);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ promptId, present: true, brandMentioned: false });
+      expect(await tdb.latestAiSearchForBrand("tm_other_team", clientId)).toEqual([]);
+    });
+  });
+
   describe("citation verification (hallucination guard)", () => {
     beforeEach(async () => {
       await db.delete(schema.citationChecks);

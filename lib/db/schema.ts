@@ -88,6 +88,23 @@ export const citationChecks = pgTable("citation_checks", {
   checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ── public.ai_search_snapshots — AI Search (Google AI Overview) visibility ──
+// OWNED by this service. One row per (prompt, engine) check: was an AI
+// Overview shown for the prompt as a Google query, did it mention the brand,
+// and which sources it cited. Latest row per prompt is what the UI shows.
+export const aiSearchSnapshots = pgTable("ai_search_snapshots", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id").notNull(),
+  promptId: text("prompt_id").notNull(),
+  engine: text("engine").notNull().default("google_aio"),
+  query: text("query").notNull(),
+  present: boolean("present").notNull(),
+  brandMentioned: boolean("brand_mentioned"),
+  overviewText: text("overview_text"),
+  citedUrls: jsonb("cited_urls").$type<Array<{ url: string; label: string }>>().default([]),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── public.rate_limits — DB-backed rate limiter (shared with geo) ───────────
 export const rateLimits = pgTable("rate_limits", {
   key: text("key").primaryKey(),

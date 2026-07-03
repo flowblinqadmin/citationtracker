@@ -7,6 +7,10 @@
     {
       "path": "/citations/api/cron/verify-citations",
       "schedule": "15 * * * *"
+    },
+    {
+      "path": "/citations/api/cron/ai-search",
+      "schedule": "30 * * * *"
     }
   ]
 }

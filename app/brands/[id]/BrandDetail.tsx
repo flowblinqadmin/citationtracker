@@ -49,6 +49,15 @@ interface Run {
   };
 }
 
+interface AiSearchRow {
+  promptId: string;
+  promptText: string;
+  present: boolean;
+  brandMentioned: boolean | null;
+  citedUrls: Array<{ url: string; label: string }>;
+  checkedAt: string | null;
+}
+
 interface TopSource {
   page: string;  // normalized host/path label
   url: string;   // resolved working link
@@ -332,6 +341,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
   const [history, setHistory] = useState<Record<string, HistoryRow[]>>({});
   const [topSources, setTopSources] = useState<Record<string, TopSource[]>>({});
   const [sourceChecks, setSourceChecks] = useState<Record<string, Record<string, CheckStatus>>>({});
+  const [aiSearch, setAiSearch] = useState<AiSearchRow[] | null>(null);
 
   const load = useCallback(async () => {
     const [brandRes, promptsRes, runsRes, teamRes] = await Promise.all([
@@ -430,6 +440,14 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
       }
     }
   }
+
+  // Overview also shows AI-search (Google AI Overview) visibility per prompt.
+  useEffect(() => {
+    if (tab !== "overview" || aiSearch !== null) return;
+    void fetch(apiUrl(`/api/brands/${clientId}/ai-search`)).then(async (res) => {
+      if (res.ok) setAiSearch((await res.json()).aiSearch ?? []);
+    });
+  }, [tab, aiSearch, clientId]);
 
   // Overview needs the latest complete run's replies for the sentiment split.
   const latestComplete = runs.find((r) => r.status === "complete" && r.metrics) ?? null;
@@ -663,6 +681,39 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                             <span style={{ color: MUTED, whiteSpace: "nowrap" }}>
                               {sSrc.platforms.map((p) => PLATFORM_LABEL[p] ?? p).join(" + ")} · {sSrc.count}×
                             </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {aiSearch !== null && aiSearch.length > 0 && (
+                    <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
+                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>
+                        AI Search — Google AI Overview (checked daily)
+                      </div>
+                      <div style={{ display: "grid", gap: 10, fontSize: 13 }}>
+                        {aiSearch.map((row) => (
+                          <div key={row.promptId}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                              <span style={{ overflowWrap: "anywhere" }}>{row.promptText}</span>
+                              <span style={{ whiteSpace: "nowrap", fontWeight: 600, color: !row.present ? MUTED : row.brandMentioned ? GREEN : RED }}>
+                                {!row.present ? "no AI Overview" : row.brandMentioned ? "✓ brand in overview" : "✗ brand absent"}
+                              </span>
+                            </div>
+                            {row.present && row.citedUrls.length > 0 && (
+                              <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
+                                Overview cites:{" "}
+                                {row.citedUrls.slice(0, 6).map((c, i) => (
+                                  <span key={c.url}>
+                                    {i > 0 && " · "}
+                                    <a href={c.url} target="_blank" rel="noopener noreferrer" style={{ color: hostOf(c.url)?.endsWith(brand?.domain?.replace(/^www\./, "") ?? "\u0000") ? GREEN : ACCENT }}>
+                                      {hostOf(c.url) ?? c.label}
+                                    </a>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>

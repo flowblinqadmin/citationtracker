@@ -160,6 +160,21 @@ CREATE TABLE IF NOT EXISTS citation_checks (
 );
 CREATE INDEX IF NOT EXISTS citation_checks_run_id_idx ON citation_checks (run_id);
 
+CREATE TABLE IF NOT EXISTS ai_search_snapshots (
+  id              text PRIMARY KEY,
+  client_id       text NOT NULL,
+  prompt_id       text NOT NULL,
+  engine          text NOT NULL DEFAULT 'google_aio',
+  query           text NOT NULL,
+  present         boolean NOT NULL,
+  brand_mentioned boolean,
+  overview_text   text,
+  cited_urls      jsonb DEFAULT '[]',
+  checked_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ai_search_snapshots_client_idx ON ai_search_snapshots (client_id);
+CREATE INDEX IF NOT EXISTS ai_search_snapshots_prompt_idx ON ai_search_snapshots (prompt_id, checked_at DESC);
+
 CREATE TABLE IF NOT EXISTS tracker.citations (
   id text PRIMARY KEY,
   response_id text REFERENCES tracker.responses(id) ON DELETE SET NULL,
