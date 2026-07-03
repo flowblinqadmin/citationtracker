@@ -48,7 +48,9 @@ interface Run {
   };
 }
 
-interface TopDomain {
+interface TopSource {
+  page: string;  // normalized host/path label
+  url: string;   // resolved working link
   domain: string;
   count: number;
   brand: boolean;
@@ -307,7 +309,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
   const [replies, setReplies] = useState<Record<string, ReplyRow[]>>({});
   const [historyPromptId, setHistoryPromptId] = useState<string | null>(null);
   const [history, setHistory] = useState<Record<string, HistoryRow[]>>({});
-  const [topDomains, setTopDomains] = useState<Record<string, TopDomain[]>>({});
+  const [topSources, setTopSources] = useState<Record<string, TopSource[]>>({});
 
   const load = useCallback(async () => {
     const [brandRes, promptsRes, runsRes, teamRes] = await Promise.all([
@@ -416,7 +418,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
       if (res.ok) {
         const body = await res.json();
         setReplies((m) => ({ ...m, [latestCompleteId]: body.responses }));
-        setTopDomains((m) => ({ ...m, [latestCompleteId]: body.topDomains ?? [] }));
+        setTopSources((m) => ({ ...m, [latestCompleteId]: body.topSources ?? [] }));
       }
     });
   }, [tab, latestCompleteId, clientId, replies]);
@@ -432,7 +434,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
       if (res.ok) {
         const body = await res.json();
         setReplies((m) => ({ ...m, [runId]: body.responses }));
-        setTopDomains((m) => ({ ...m, [runId]: body.topDomains ?? [] }));
+        setTopSources((m) => ({ ...m, [runId]: body.topSources ?? [] }));
       }
     }
   }
@@ -578,7 +580,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                   : null;
               const trend = [...runs].filter((r) => r.status === "complete" && r.metrics).reverse();
               const latestReplies = replies[latestComplete.id];
-              const latestDomains = topDomains[latestComplete.id];
+              const latestSources = topSources[latestComplete.id];
               const sentimentCounts = latestReplies ? tallySentiment(finalAttempts(latestReplies)) : null;
               return (
                 <div style={{ display: "grid", gap: 12 }}>
@@ -616,21 +618,22 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                     </div>
                   </div>
 
-                  {latestDomains && latestDomains.length > 0 && (
+                  {latestSources && latestSources.length > 0 && (
                     <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
-                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Top cited sources (latest run)</div>
+                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Top cited pages (latest run)</div>
                       <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
-                        {latestDomains.map((d) => (
-                          <div key={d.domain} style={{ display: "flex", justifyContent: "space-between" }}>
+                        {latestSources.map((sSrc) => (
+                          <div key={sSrc.page} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                             <a
-                              href={`https://${d.domain}`}
+                              href={sSrc.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{ fontWeight: d.brand ? 700 : 400, color: d.brand ? GREEN : ACCENT }}
+                              title={sSrc.url}
+                              style={{ fontWeight: sSrc.brand ? 700 : 400, color: sSrc.brand ? GREEN : ACCENT, overflowWrap: "anywhere" }}
                             >
-                              {d.domain}{d.brand ? " · you" : ""}
+                              {sSrc.page.length > 70 ? `${sSrc.page.slice(0, 70)}…` : sSrc.page}{sSrc.brand ? " · you" : ""}
                             </a>
-                            <span style={{ color: MUTED }}>{d.count}×</span>
+                            <span style={{ color: MUTED, whiteSpace: "nowrap" }}>{sSrc.count}×</span>
                           </div>
                         ))}
                       </div>

@@ -373,9 +373,15 @@ describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
       expect(run.citationStats.totalCitations).toBe(5);
     });
 
-    it("lists a run's top cited domains, excluding unresolved redirect hosts", async () => {
-      const top = await tdb.getRunTopDomains(TEAM, clientId, runId);
-      expect(top[0]).toEqual({ domain: "acme.com", count: 1, brand: true });
+    it("lists a run's top cited PAGES (exact URLs), excluding unresolved redirect hosts", async () => {
+      const top = await tdb.getRunTopSources(TEAM, clientId, runId);
+      expect(top[0]).toEqual({
+        page: "acme.com/x",
+        url: "https://acme.com/x",
+        domain: "acme.com",
+        count: 1,
+        brand: true,
+      });
       expect(top).toHaveLength(4); // cit_5's vertexaisearch host is filtered out
       expect(top.find((d) => d.domain === "docs.acme.com")?.brand).toBe(true);
       expect(top.find((d) => d.domain === "wikipedia.org")?.brand).toBe(false);
@@ -384,7 +390,7 @@ describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
 
     it("cross-org: stats and domains are empty for a foreign team", async () => {
       expect(await tdb.listRunsWithStats("tm_other_team", clientId)).toEqual([]);
-      expect(await tdb.getRunTopDomains("tm_other_team", clientId, runId)).toEqual([]);
+      expect(await tdb.getRunTopSources("tm_other_team", clientId, runId)).toEqual([]);
     });
   });
 });

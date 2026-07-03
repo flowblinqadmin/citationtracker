@@ -340,7 +340,11 @@ export async function listRunsWithStats(teamId: string, clientId: string): Promi
   });
 }
 
-export interface TopDomain {
+export interface TopSource {
+  /** Display label: the normalized URL (host/path, no protocol). */
+  page: string;
+  /** Working link: the redirect-resolved URL (falls back to the raw URL). */
+  url: string;
   domain: string;
   count: number;
   brand: boolean;
@@ -351,25 +355,27 @@ export interface TopDomain {
 // host falls through — those links die, so never surface them as sources.
 const REDIRECT_HOSTS = ["vertexaisearch.cloud.google.com"];
 
-/** A run's most-cited domains, brand-flagged, most-cited first. */
-export async function getRunTopDomains(
+/** A run's most-cited PAGES (exact URLs, not just domains), most-cited first. */
+export async function getRunTopSources(
   teamId: string,
   clientId: string,
   runId: string,
   limit = 10,
-): Promise<TopDomain[]> {
+): Promise<TopSource[]> {
   const brand = await getBrand(teamId, clientId);
   if (!brand) return [];
   const brandDomain = brand.domain ? stripWww(brand.domain) : null;
   const rows = await db
     .select({
+      page: trackerCitations.normalizedUrl,
       domain: trackerCitations.domain,
       count: sql<number>`count(*)::int`,
+      url: sql<string>`min(coalesce(${trackerCitations.resolvedUrl}, ${trackerCitations.rawUrl}))`,
     })
     .from(trackerCitations)
     .where(and(eq(trackerCitations.runId, runId), eq(trackerCitations.clientId, clientId)))
-    .groupBy(trackerCitations.domain)
-    .orderBy(sql`count(*) desc`, asc(trackerCitations.domain))
+    .groupBy(trackerCitations.normalizedUrl, trackerCitations.domain)
+    .orderBy(sql`count(*) desc`, asc(trackerCitations.normalizedUrl))
     .limit(limit);
   return rows
     .filter((r) => r.domain !== "" && !REDIRECT_HOSTS.includes(r.domain))
