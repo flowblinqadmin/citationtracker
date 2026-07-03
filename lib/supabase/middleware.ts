@@ -16,11 +16,8 @@ export async function updateSession(request: NextRequest) {
     console.error(`[MIDDLEWARE] START: ${pathname}`);
   }
 
-  // Skip static files and auth callback early
-  if (
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/auth/callback")
-  ) {
+  // Skip static files early
+  if (pathname.startsWith("/_next")) {
     return NextResponse.next();
   }
 
@@ -64,34 +61,13 @@ export async function updateSession(request: NextRequest) {
   // identity in server code; protect pages with getUser().
   const { data: { user } } = await supabase.auth.getUser();
 
-  const isAuthenticated = !!user;
-
   if (DEBUG) {
-    console.error(`[MIDDLEWARE] getUser: authenticated=${isAuthenticated}`);
+    console.error(`[MIDDLEWARE] getUser: authenticated=${!!user}`);
   }
 
-  // /dashboard requires authentication
-  const isProtectedPath = pathname.startsWith("/dashboard");
-
-  if (!isAuthenticated && isProtectedPath) {
-    // Preserve query string in redirectTo so post-auth navigation can act on
-    // signals like ?onboard=install (Bravo's $10-buyer install-CTA target).
-    // Without this, customers whose magic link expires get OTP-fallbacked to
-    // /dashboard with no install signal.
-    const redirectTo = encodeURIComponent(pathname + request.nextUrl.search);
-    if (DEBUG) console.error(`[MIDDLEWARE] REDIRECT: ${pathname} -> /auth/login`);
-    return NextResponse.redirect(new URL(`/auth/login?redirectTo=${redirectTo}`, request.url));
-  }
-
-  // Redirect authenticated users away from login page — unless ?switch=1 is set,
-  // which allows switching accounts without the old session leaking through.
-  if (isAuthenticated && pathname === "/auth/login") {
-    const switchAccount = request.nextUrl.searchParams.get("switch");
-    if (!switchAccount) {
-      if (DEBUG) console.error(`[MIDDLEWARE] REDIRECT: /auth/login -> /dashboard`);
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
-  }
+  // No redirects here — this service has no auth pages of its own (login lives
+  // on geo). The outer middleware decides redirect vs 401 from the presence of
+  // the x-user-id header stamped below.
 
   // Forward VERIFIED identity to downstream API routes (which trust x-user-id
   // without re-validating — see lib/supabase/authenticated-client.ts). The id

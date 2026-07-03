@@ -1,8 +1,0 @@
-url
-not-a-url
-ftp://invalid-scheme.com/page
-javascript:alert(1)
-  spaces in url
-https://www.manipalhospitals.com/valid-page/
-gibberish###
-http://
