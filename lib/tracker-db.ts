@@ -19,7 +19,7 @@ import type {
   TrackerPromptCategory,
   TrackerRunFrequency,
 } from "@/lib/types/tracker";
-import { and, asc, desc, eq, inArray, like } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, like } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
 const MAX_ACTIVE_PROMPTS = 30;
@@ -256,7 +256,8 @@ export async function listRuns(teamId: string, clientId: string): Promise<Tracke
     .select()
     .from(trackerRuns)
     .where(eq(trackerRuns.clientId, clientId))
-    .orderBy(desc(trackerRuns.createdAt));
+    .orderBy(desc(trackerRuns.createdAt))
+    .limit(50); // the UI shows recent history; metrics blobs make rows heavy
 }
 
 export type ManualRunResult =
@@ -315,12 +316,17 @@ export interface ReconcileRun {
   teamId: string;
 }
 
-/** All runs belonging to this service's team-orgs (never PCG's). */
+/**
+ * Runs belonging to this service's team-orgs (never PCG's), bounded to the
+ * last 90 days — reconciliation states settle within hours, and an unbounded
+ * scan would grow linearly forever on an hourly cron.
+ */
 export async function listTeamRuns(): Promise<ReconcileRun[]> {
+  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   const rows = await db
     .select({ run: trackerRuns, orgId: trackerOrgs.id })
     .from(trackerRuns)
     .innerJoin(trackerOrgs, eq(trackerRuns.orgId, trackerOrgs.id))
-    .where(like(trackerOrgs.id, "team\\_%"));
+    .where(and(like(trackerOrgs.id, "team\\_%"), gte(trackerRuns.createdAt, cutoff)));
   return rows.map((r) => ({ run: r.run, teamId: r.orgId.slice("team_".length) }));
 }

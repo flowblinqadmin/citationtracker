@@ -80,12 +80,21 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
   }, [load]);
 
   // Poll while a run is in flight so status + metrics appear without a reload.
+  // Only the runs list can change mid-run — refresh everything else once when
+  // the run leaves pending/running.
   const hasActiveRun = runs.some((r) => r.status === "pending" || r.status === "running");
   useEffect(() => {
     if (!hasActiveRun) return;
-    const t = setInterval(() => void load(), 5000);
+    const t = setInterval(async () => {
+      const res = await fetch(apiUrl(`/api/brands/${clientId}/runs`));
+      if (!res.ok) return;
+      const { runs: fresh } = (await res.json()) as { runs: Run[] };
+      setRuns(fresh);
+      const stillActive = fresh.some((r) => r.status === "pending" || r.status === "running");
+      if (!stillActive) void load(); // final refresh: balance, prompts, brand
+    }, 5000);
     return () => clearInterval(t);
-  }, [hasActiveRun, load]);
+  }, [hasActiveRun, clientId, load]);
 
   const runCost = prompts.length > 0 ? citationRunCredits(prompts.length) : 0;
   const inLibrary = new Set(prompts.map((p) => p.name));
