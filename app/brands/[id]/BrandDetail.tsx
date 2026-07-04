@@ -167,14 +167,25 @@ function tallySentiment(finals: ReplyRow[]): SentimentCounts {
   return counts;
 }
 
-function SentimentSplit({ counts }: { counts: SentimentCounts }) {
+function SentimentSplit({ counts, onSelect }: { counts: SentimentCounts; onSelect?: (s: "positive" | "neutral" | "negative") => void }) {
   return (
     <>
       {(["positive", "neutral", "negative"] as const).map((k) =>
         counts[k] > 0 ? (
-          <span key={k} style={{ color: SENTIMENT_STYLE[k].color, fontWeight: 600 }}>
-            {counts[k]} {k}
-          </span>
+          onSelect ? (
+            <button
+              key={k}
+              onClick={() => onSelect(k)}
+              title={`Show the ${k} replies`}
+              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: SENTIMENT_STYLE[k].color, fontWeight: 600, fontSize: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}
+            >
+              {counts[k]} {k}
+            </button>
+          ) : (
+            <span key={k} style={{ color: SENTIMENT_STYLE[k].color, fontWeight: 600 }}>
+              {counts[k]} {k}
+            </span>
+          )
         ) : null,
       )}
       {counts.unclassified > 0 && <span style={{ color: MUTED }}>{counts.unclassified} unclassified</span>}
@@ -205,7 +216,7 @@ function MetricCard({ label, value, sub }: { label: string; value: string; sub?:
 }
 
 /** The run at a glance — nobody reads every reply. */
-function RunDigest({ rows }: { rows: ReplyRow[] }) {
+function RunDigest({ rows, onSelectSentiment }: { rows: ReplyRow[]; onSelectSentiment?: (s: "positive" | "neutral" | "negative") => void }) {
   const finals = finalAttempts(rows);
   if (finals.length === 0) return null;
   const mentioned = finals.filter((r) => r.brandMentioned).length;
@@ -215,7 +226,7 @@ function RunDigest({ rows }: { rows: ReplyRow[] }) {
       <span>
         <strong>{mentioned}</strong> of {finals.length} replies mention the brand
       </span>
-      <SentimentSplit counts={counts} />
+      <SentimentSplit counts={counts} onSelect={onSelectSentiment} />
     </div>
   );
 }
@@ -342,6 +353,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
   const [topSources, setTopSources] = useState<Record<string, TopSource[]>>({});
   const [sourceChecks, setSourceChecks] = useState<Record<string, Record<string, CheckStatus>>>({});
   const [aiSearch, setAiSearch] = useState<AiSearchRow[] | null>(null);
+  const [replyFilter, setReplyFilter] = useState<{ runId: string; sentiment: "positive" | "neutral" | "negative" } | null>(null);
 
   const load = useCallback(async () => {
     const [brandRes, promptsRes, runsRes, teamRes] = await Promise.all([
@@ -496,6 +508,14 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
     }
   }
 
+  /** Jump from a sentiment count to the matching replies of that run. */
+  function showSentimentReplies(runId: string, sentiment: "positive" | "neutral" | "negative") {
+    setReplyFilter({ runId, sentiment });
+    setOpenRunId(runId);
+    setTab("runs");
+    if (!replies[runId]) void toggleReplies(runId);
+  }
+
   async function runNow(promptIds?: string[]) {
     setRunning(true);
     try {
@@ -645,7 +665,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                       <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Brand sentiment (latest run)</div>
                       {sentimentCounts ? (
                         <div style={{ display: "flex", gap: 14, fontSize: 14, flexWrap: "wrap" }}>
-                          <SentimentSplit counts={sentimentCounts} />
+                          <SentimentSplit counts={sentimentCounts} onSelect={(sent) => showSentimentReplies(latestComplete.id, sent)} />
                           {sentimentCounts.positive + sentimentCounts.neutral + sentimentCounts.negative + sentimentCounts.unclassified === 0 && (
                             <span style={{ color: MUTED, fontSize: 12 }}>brand not mentioned in any reply</span>
                           )}
@@ -915,8 +935,17 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
               )}
               {openRunId === r.id && replies[r.id] && (
                 <div style={{ marginTop: 10, display: "grid", gap: 12 }}>
-                  <RunDigest rows={replies[r.id]} />
+                  <RunDigest rows={replies[r.id]} onSelectSentiment={(sent) => setReplyFilter({ runId: r.id, sentiment: sent })} />
+                  {replyFilter?.runId === r.id && (
+                    <div style={{ fontSize: 12, color: SENTIMENT_STYLE[replyFilter.sentiment].color }}>
+                      Showing {replyFilter.sentiment} replies only{" "}
+                      <button onClick={() => setReplyFilter(null)} style={{ background: "none", border: "none", padding: 0, color: ACCENT, cursor: "pointer", fontSize: 12, textDecoration: "underline" }}>
+                        show all
+                      </button>
+                    </div>
+                  )}
                   {[...replies[r.id]]
+                    .filter((row) => replyFilter?.runId !== r.id || row.sentiment === replyFilter.sentiment)
                     .sort((a, b) =>
                       a.promptText === b.promptText
                         ? PLATFORM_ORDER.indexOf(a.platform) - PLATFORM_ORDER.indexOf(b.platform)
