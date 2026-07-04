@@ -134,7 +134,9 @@ CREATE TABLE IF NOT EXISTS tracker.responses (
   run_id text NOT NULL REFERENCES tracker.runs(id) ON DELETE CASCADE,
   client_id text NOT NULL,
   prompt_version_id text NOT NULL REFERENCES tracker.prompt_versions(id),
-  platform text NOT NULL,
+  -- prod enforces this CHECK (geo migration 20260704) — mirror it so a new
+  -- platform that misses the prod constraint fails tests too
+  platform text NOT NULL CHECK (platform IN ('perplexity', 'openai', 'google', 'anthropic')),
   model text,
   attempt integer NOT NULL DEFAULT 1,
   response_text text,
