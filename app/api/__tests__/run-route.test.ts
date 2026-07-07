@@ -74,7 +74,9 @@ describe.skipIf(!dbUrl)("POST /api/brands/[id]/run (Postgres)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain("qstash.upstash.io/v2/publish/");
-    expect(url).toContain("/api/tracker/worker");
+    // OUR worker at the direct vercel.app URL (incl. basePath) — never the geo
+    // rewrite, and never geo's /api/tracker/worker.
+    expect(url).toContain("citationtracker.vercel.app/citations/api/cron/tracker-worker");
     expect(init.headers.Authorization).toBe("Bearer qstash-test-token");
     const payload = JSON.parse(init.body);
     expect(payload).toEqual({ runId: body.run.id, clientId, cursor: 0 });
@@ -147,7 +149,7 @@ describe.skipIf(!dbUrl)("POST /api/brands/[id]/run (Postgres)", () => {
     expect(body.run.promptsTotal).toBe(1);
     expect(body.run.scope.platforms).toEqual(["google"]);
     expect(body.run.scope.promptVersionIds).toHaveLength(1);
-    // worker payload is unchanged — geo reads scope from the run row
+    // worker payload is unchanged — the runner reads scope from the run row
     const payload = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(payload).toEqual({ runId: body.run.id, clientId, cursor: 0 });
   });

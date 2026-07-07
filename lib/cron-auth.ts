@@ -47,6 +47,27 @@ export function getCronSecret(): string {
 }
 
 /**
+ * True when the caller's Bearer token matches CRON_SECRET. Constant-time-ish
+ * compare (short-circuit on length mismatch is safe — length is not secret).
+ * False when the secret is unset/invalid — callers that need to distinguish
+ * misconfig (503) from bad auth (401) use assertCronAuth instead.
+ */
+export function cronBearerValid(req: NextRequest | Request): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!isValid(secret)) return false;
+
+  const header = req.headers.get("authorization") ?? "";
+  const supplied = header.startsWith("Bearer ") ? header.slice(7) : "";
+  if (supplied.length !== secret.length) return false;
+
+  let diff = 0;
+  for (let i = 0; i < supplied.length; i++) {
+    diff |= supplied.charCodeAt(i) ^ secret.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+/**
  * Returns null when the caller's Bearer token matches CRON_SECRET; otherwise
  * a 401/503 NextResponse the route should immediately return.
  *
@@ -63,19 +84,7 @@ export function assertCronAuth(
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
 
-  const header = req.headers.get("authorization") ?? "";
-  const supplied = header.startsWith("Bearer ") ? header.slice(7) : "";
-
-  // Constant-time-ish compare. Short-circuit on length mismatch is safe
-  // because length is not secret.
-  if (supplied.length !== secret.length) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  let diff = 0;
-  for (let i = 0; i < supplied.length; i++) {
-    diff |= supplied.charCodeAt(i) ^ secret.charCodeAt(i);
-  }
-  if (diff !== 0) {
+  if (!cronBearerValid(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return null;

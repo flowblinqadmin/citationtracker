@@ -57,6 +57,12 @@ describe("anonymous-public paths (no session constructed)", () => {
     expect(res.status).toBe(200);
     expect(updateSessionMock).not.toHaveBeenCalled();
   });
+
+  it("/api/cron/tracker-worker passes without session (QStash signature / cron Bearer verified in the route)", async () => {
+    const res = await middleware(req("/api/cron/tracker-worker"));
+    expect(res.status).toBe(200);
+    expect(updateSessionMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("session-gated paths — unauthenticated", () => {

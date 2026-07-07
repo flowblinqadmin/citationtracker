@@ -1,53 +1,22 @@
-// "Run now" — the credit-gated trigger for geo's tracker worker.
+// "Run now" — the credit-gated trigger for the in-repo tracker worker.
 //
 // Order matters: create the run row → debit (the unique ledger reference is
 // the double-submit gate — the losing duplicate deletes its row) → publish to
-// QStash, which calls geo's deployed /api/tracker/worker (executing here would
-// block for up to 800s; QStash publish returns in <1s, exactly geo's own
-// pattern). Publish failure → run failed + refund.
+// QStash, which calls THIS service's /api/cron/tracker-worker (executing here
+// would block for up to 800s; QStash publish returns in <1s). Publish failure
+// → run failed + refund.
 import { NextRequest, NextResponse } from "next/server";
 import { getTeamContext } from "@/lib/team";
 import { createManualRunRow, deleteRunRow, markRunFailed } from "@/lib/tracker-db";
 import { citationRunCredits, debitForRun, refundForRun } from "@/lib/credits";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { getCronSecret } from "@/lib/cron-auth";
 import { GEO_ORIGIN } from "@/lib/config";
+import { enqueueTrackerJob } from "@/lib/engine/enqueue";
 import { runScopeSchema } from "@/app/api/brands/brand-schema";
 
-const RUNS_PER_HOUR = 10; // per team — runs burn paid provider APIs on geo's keys
+const RUNS_PER_HOUR = 10; // per team — runs burn paid provider APIs
 
 type Ctx = { params: Promise<{ id: string }> };
-
-async function enqueueWorker(runId: string, clientId: string): Promise<void> {
-  const workerUrl = `${GEO_ORIGIN}/api/tracker/worker`;
-  const body = JSON.stringify({ runId, clientId, cursor: 0 });
-  const qstashToken = process.env.QSTASH_TOKEN;
-
-  if (qstashToken) {
-    // QStash accounts are regional — QSTASH_URL (same var geo's SDK reads)
-    // must point at the account's endpoint or publishes 404.
-    const qstashBase = process.env.QSTASH_URL ?? "https://qstash.upstash.io";
-    const res = await fetch(`${qstashBase}/v2/publish/${workerUrl}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${qstashToken}`,
-        "Content-Type": "application/json",
-        "Upstash-Retries": "0", // geo's cron is the retry path (its convention)
-      },
-      body,
-    });
-    if (!res.ok) throw new Error(`QStash publish failed: ${res.status}`);
-    return;
-  }
-
-  // Local dev fallback: call the worker directly, fire-and-forget (it can run
-  // for minutes; geo's LOCAL_PIPELINE does the same).
-  void fetch(workerUrl, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${getCronSecret()}`, "Content-Type": "application/json" },
-    body,
-  }).catch((err) => console.error(`[run] direct worker call failed for ${runId}:`, err));
-}
 
 export async function POST(req: NextRequest, { params }: Ctx) {
   const ctx = await getTeamContext();
@@ -97,7 +66,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   try {
-    await enqueueWorker(run.id, run.clientId);
+    await enqueueTrackerJob({ runId: run.id, clientId: run.clientId, cursor: 0 });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await markRunFailed(run.id, message);
