@@ -10,12 +10,14 @@ import { apiUrl } from "@/lib/api-url";
 import { GEO_ORIGIN } from "@/lib/config";
 import { citationRunCredits } from "@/lib/pricing";
 import { PROMPT_LIBRARY, PROMPT_CATEGORIES, fillTemplate } from "@/lib/prompt-library";
-import type { TrackerRunMetrics, TrackerPromptCategory, TrackerRunFrequency } from "@/lib/types/tracker";
+import type { TrackerRunMetrics, TrackerPromptCategory, TrackerRunFrequency, TrackerCompetitor } from "@/lib/types/tracker";
+import CompetitorEditor from "./CompetitorEditor";
 
 interface Brand {
   id: string;
   name: string;
   domain: string | null;
+  competitors: TrackerCompetitor[] | null;
   runFrequency: TrackerRunFrequency;
 }
 
@@ -778,6 +780,15 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                 </div>
               );
             })()
+          )}
+          {brand && (
+            <CompetitorEditor
+              // Remount with fresh rows when a save round-trips (load() refreshes brand).
+              key={JSON.stringify(brand.competitors ?? [])}
+              clientId={clientId}
+              competitors={brand.competitors ?? []}
+              onSaved={load}
+            />
           )}
         </section>
       )}

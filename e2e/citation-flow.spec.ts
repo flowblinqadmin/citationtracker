@@ -71,6 +71,28 @@ test("engine results surface: sentiment split and actual replies", async ({ page
   await expect(page.getByText(/e2e provider fixture/).first()).toBeVisible();
 });
 
+test("competitor editor: saved competitors persist and SoAV lights up retroactively", async ({ page }) => {
+  await page.goto("/citations");
+  await page.getByRole("link", { name: new RegExp(brandName) }).click();
+
+  // Without competitors the brand wins every citation it has: 8/(8+0) = 100%.
+  const soavCard = page.getByText("Share of AI voice", { exact: true }).locator("..");
+  await expect(soavCard.getByText("100%")).toBeVisible();
+
+  await page.getByRole("button", { name: "+ Add competitor" }).click();
+  await page.getByPlaceholder("Competitor name (e.g. Apollo)").fill("Third Party");
+  await page.getByPlaceholder("Domain (e.g. apollo.com)").fill("thirdparty.example");
+  await page.getByRole("button", { name: "Save competitors" }).click();
+  await expect(page.getByText(/Competitors saved/)).toBeVisible({ timeout: 10_000 });
+
+  // Persisted across reload, and the ALREADY-completed run's citations now
+  // split brand vs competitor (fixture cites one of each per reply → 50%).
+  await page.reload();
+  await expect(page.getByPlaceholder("Domain (e.g. apollo.com)")).toHaveValue("thirdparty.example");
+  const soavAfter = page.getByText("Share of AI voice", { exact: true }).locator("..");
+  await expect(soavAfter.getByText("50%")).toBeVisible();
+});
+
 test("insufficient credits → 402 upsell, no charge", async ({ page }) => {
   await setBalance(0);
   await page.goto("/citations");
