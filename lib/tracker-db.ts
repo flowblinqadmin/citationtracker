@@ -26,7 +26,7 @@ import type {
   TrackerRunFrequency,
   TrackerRunScope,
 } from "@/lib/types/tracker";
-import { and, asc, desc, eq, gte, inArray, isNull, like, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, like, lt, ne, or, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
 const MAX_ACTIVE_PROMPTS = 30;
@@ -780,6 +780,88 @@ export async function listTeamRuns(): Promise<ReconcileRun[]> {
     .innerJoin(trackerOrgs, eq(trackerRuns.orgId, trackerOrgs.id))
     .where(and(like(trackerOrgs.id, "team\\_%"), gte(trackerRuns.createdAt, cutoff)));
   return rows.map((r) => ({ run: r.run, teamId: r.orgId.slice("team_".length) }));
+}
+
+// ── Scheduler (tracker-run cron) ─────────────────────────────────────────────
+// Team-org scoping is load-bearing: PCG's clients/runs share these tables and
+// must never be scheduled or recovered by this service (their prompts would
+// execute on OUR provider keys).
+
+export interface DueTeamClient {
+  id: string;
+  orgId: string;
+  runFrequency: TrackerRunFrequency;
+}
+
+/** Active team-org clients whose next_run_at is due or never set. */
+export async function listDueTeamClients(now: Date, limit: number): Promise<DueTeamClient[]> {
+  return db
+    .select({
+      id: trackerClients.id,
+      orgId: trackerClients.orgId,
+      runFrequency: trackerClients.runFrequency,
+    })
+    .from(trackerClients)
+    .where(
+      and(
+        like(trackerClients.orgId, "team\\_%"),
+        eq(trackerClients.status, "active"),
+        ne(trackerClients.runFrequency, "manual"),
+        or(lt(trackerClients.nextRunAt, now), isNull(trackerClients.nextRunAt)),
+      ),
+    )
+    .limit(limit);
+}
+
+/**
+ * Advance next_run_at by the client's cadence. The cron calls this BEFORE
+ * creating/enqueueing so a failure never re-picks the client every tick
+ * (stale-run recovery is the retry path).
+ */
+export async function advanceClientNextRun(
+  clientId: string,
+  frequency: TrackerRunFrequency,
+  now: Date,
+): Promise<void> {
+  await db
+    .update(trackerClients)
+    .set({ nextRunAt: nextRunAtFor(frequency, now), updatedAt: now })
+    .where(eq(trackerClients.id, clientId));
+}
+
+export interface StaleTeamRun {
+  id: string;
+  clientId: string;
+  cursor: number;
+}
+
+/** Team-org runs stuck 'running'/'pending' beyond the stale window. */
+export async function listStaleTeamRuns(cutoff: Date, limit: number): Promise<StaleTeamRun[]> {
+  return db
+    .select({ id: trackerRuns.id, clientId: trackerRuns.clientId, cursor: trackerRuns.cursor })
+    .from(trackerRuns)
+    .where(
+      and(
+        like(trackerRuns.orgId, "team\\_%"),
+        inArray(trackerRuns.status, ["running", "pending"]),
+        lt(trackerRuns.createdAt, cutoff),
+      ),
+    )
+    .limit(limit);
+}
+
+/**
+ * 12-month response-body retention purge — deliberately GLOBAL (PCG rows
+ * included): this service owns the shared table's hygiene once geo's tracker
+ * cron is deleted. Citations carry denormalized run/client ids and survive
+ * (their response FK is SET NULL, not CASCADE).
+ */
+export async function purgeOldResponses(cutoff: Date): Promise<number> {
+  const purged = await db
+    .delete(trackerResponses)
+    .where(lt(trackerResponses.createdAt, cutoff))
+    .returning({ id: trackerResponses.id });
+  return purged.length;
 }
 
 // ── Replies (full response text) ─────────────────────────────────────────────

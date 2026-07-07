@@ -13,7 +13,6 @@ export const TRACKER_RETENTION_MONTHS = 12;        // full response text retaine
 export const TRACKER_BATCH_SIZE = 10;              // parallel (promptVersion × platform) queries per batch
 export const TRACKER_BATCH_DELAY_MS = 100;         // ms between batches (R31: avoid provider 429s)
 export const TRACKER_MAX_TOKENS = 1024;            // full response text is stored, not just a list
-export const TRACKER_RUN_INTERVAL_DAYS = 30;       // schedule cadence (advance next_run_at by ~1 month)
 export const TRACKER_STALE_RUN_HOURS = 2;          // a 'running' run older than this is re-enqueued by cron
 
 /**
@@ -21,7 +20,7 @@ export const TRACKER_STALE_RUN_HOURS = 2;          // a 'running' run older than
  * requires a statically-analyzable value) — keep it equal to this constant.
  * The runner re-enqueues its cursor before the deadline.
  */
-export const WORKER_MAX_DURATION_S = 800;
+const WORKER_MAX_DURATION_S = 800;
 export const TRACKER_WORKER_DEADLINE_MS = (WORKER_MAX_DURATION_S - 15) * 1000;
 
 /**

@@ -11,6 +11,10 @@
     {
       "path": "/citations/api/cron/ai-search",
       "schedule": "30 * * * *"
+    },
+    {
+      "path": "/citations/api/cron/tracker-run",
+      "schedule": "45 * * * *"
     }
   ]
 }

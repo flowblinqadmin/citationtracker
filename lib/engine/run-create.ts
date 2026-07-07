@@ -161,31 +161,5 @@ export async function createScheduledRun(
   return { run: existing, created: false, promptVersions };
 }
 
-/**
- * Manual "Run now" — ALWAYS creates a new, preserved run (kind='manual'). There
- * is no per-period cap, so re-running a month accumulates history rather than
- * overwriting the prior run.
- */
-export async function createManualRun(
-  clientId: string,
-  orgId: string,
-  period: string = currentPeriod(),
-): Promise<CreateRunResult> {
-  const { promptVersions, promptVersionsChanged, hadPriorRun } = await snapshotForRun(clientId);
-
-  const [run] = await db
-    .insert(trackerRuns)
-    .values({
-      id: `tr_${nanoid()}`,
-      clientId,
-      orgId,
-      period,
-      kind: "manual",
-      status: "pending",
-      promptsTotal: promptVersions.length,
-      promptVersionsChanged: hadPriorRun ? promptVersionsChanged : [],
-    })
-    .returning();
-
-  return { run, created: true, promptVersions };
-}
+// NOTE: geo's createManualRun is not ported — manual runs are created by
+// lib/tracker-db.ts createManualRunRow, which adds scope + org verification.
