@@ -66,7 +66,10 @@ describe("POST /api/cron/tracker-worker — auth", () => {
     const res = await call(goodPayload, { authorization: `Bearer ${SECRET}` });
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: true, status: "complete" });
-    expect(executeMock).toHaveBeenCalledWith("tr_1", "tc_1", 0, expect.any(Number));
+    expect(executeMock).toHaveBeenCalledTimes(1);
+    const [runId, clientId, cursor, deadline] = executeMock.mock.calls[0];
+    expect([runId, clientId, cursor]).toEqual(["tr_1", "tc_1", 0]);
+    expect(deadline).toBeGreaterThan(Date.now());
   });
 
   it("accepts a valid QStash signature, verified against the exact public worker URL", async () => {

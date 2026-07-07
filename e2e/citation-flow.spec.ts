@@ -1,9 +1,11 @@
 // The definition-of-done flow: login (shared Supabase session) → create brand
-// → library + custom prompts → cost preview → run debits credits → metrics
-// render after the worker completes → 402 upsell when broke → unauthenticated
-// redirect. All under the /citations basePath.
+// → library + custom prompts → cost preview → run debits credits → the
+// IN-REPO engine executes the run for real (E2E_FAKE_PROVIDERS stubs the four
+// providers; everything else — worker auth, runner, matching, sentiment,
+// metrics — is the production path) → results render → 402 upsell when broke
+// → unauthenticated redirect. All under the /citations basePath.
 import { test, expect } from "@playwright/test";
-import { setBalance, getBalance, completeRun, latestRunId } from "./helpers/db";
+import { setBalance, getBalance } from "./helpers/db";
 import { E2E } from "./helpers/global-setup";
 
 test.use({ storageState: E2E.storageState });
@@ -38,22 +40,35 @@ test("create brand → add prompts → cost preview", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Run now · 8 credits/ })).toBeVisible();
 });
 
-test("run now debits credits and completes with metrics", async ({ page }) => {
+test("run now debits credits; the in-repo engine executes and completes the run", async ({ page }) => {
   await page.goto("/citations");
   await page.getByRole("link", { name: new RegExp(brandName) }).click();
   await page.getByRole("button", { name: /Run now/ }).click();
 
   await expect(page.getByText(/Run started — 8 credits/)).toBeVisible({ timeout: 15_000 }); // dev-server route compile on first hit
-  await expect(page.getByText("pending").or(page.getByText("running"))).toBeVisible();
   expect(await getBalance()).toBe(12);
 
-  // Simulate geo's worker finishing; the 5s poll should surface metrics.
-  const runId = await latestRunId();
-  expect(runId).toBeTruthy();
-  await completeRun(runId!);
-  await expect(page.getByText("complete")).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("Brand mentions")).toBeVisible();
-  await expect(page.getByText("100%")).toBeVisible(); // brand mention rate from seeded metrics
+  // The REAL worker + runner execute on this dev server (2 prompts × 4
+  // platforms, fake providers). The 5s poll surfaces completion + metrics.
+  await expect(page.getByText("complete")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText("Brand mentions").first()).toBeVisible();
+  // The library prompt echoes the brand name through the provider fixture; the
+  // custom prompt doesn't → brand mention rate is exactly 1/2.
+  await expect(page.getByText("50%").first()).toBeVisible();
+});
+
+test("engine results surface: sentiment split and actual replies", async ({ page }) => {
+  await page.goto("/citations");
+  await page.getByRole("link", { name: new RegExp(brandName) }).click();
+
+  // Sentiment: classified 'positive' for every brand-mentioned reply by the
+  // e2e classifier stub — the Overview split shows a non-zero positive bucket.
+  await expect(page.getByText(/\d+ positive/).first()).toBeVisible({ timeout: 15_000 });
+
+  // Replies live on the Runs tab: the stored text is the provider fixture output.
+  await page.getByRole("button", { name: /Runs \(\d+\)/ }).click();
+  await page.getByRole("button", { name: "View replies" }).first().click();
+  await expect(page.getByText(/e2e provider fixture/).first()).toBeVisible();
 });
 
 test("insufficient credits → 402 upsell, no charge", async ({ page }) => {

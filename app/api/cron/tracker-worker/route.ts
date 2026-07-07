@@ -12,10 +12,32 @@
 // is the retry path — a 5xx here would buy nothing.
 import { NextRequest, NextResponse } from "next/server";
 import { Receiver } from "@upstash/qstash";
-import { executeTrackerRun, failRun } from "@/lib/engine/runner";
+import { executeTrackerRun, failRun, type RunnerDeps } from "@/lib/engine/runner";
 import { enqueueTrackerJob, trackerWorkerUrl, type TrackerJobPayload } from "@/lib/engine/enqueue";
 import { cronBearerValid } from "@/lib/cron-auth";
 import { TRACKER_WORKER_DEADLINE_MS } from "@/lib/config";
+
+/**
+ * E2E seam (E2E_FAKE_PROVIDERS=1, set only by playwright.config.ts):
+ * deterministic provider stubs so Playwright exercises the REAL runner —
+ * worklist, persistence, matching, sentiment, metrics — without provider keys
+ * or network. The stub echoes the prompt (so prompts containing the brand
+ * name register as brand mentions) and always cites one page on the e2e
+ * brand's domain plus one third-party page.
+ */
+function e2eDeps(): RunnerDeps {
+  if (process.env.E2E_FAKE_PROVIDERS !== "1") return {};
+  const fake = async (prompt: string) => ({
+    text: `1. Options for "${prompt.slice(0, 120)}" — e2e provider fixture.`,
+    responseTimeMs: 5,
+    citedUrls: ["https://acme-e2e.com/reviews/best-tools", "https://thirdparty.example/roundup"],
+  });
+  return {
+    queryFns: { perplexity: fake, openai: fake, google: fake, anthropic: fake },
+    resolveRedirectsFn: async (url: string) => url,
+    classifySentimentFn: async () => "positive" as const,
+  };
+}
 
 // Keep equal to WORKER_MAX_DURATION_S in lib/config.ts (Next.js requires a
 // statically-analyzable literal here).
@@ -57,7 +79,7 @@ export async function POST(req: NextRequest) {
 
   const deadline = Date.now() + TRACKER_WORKER_DEADLINE_MS;
   try {
-    const result = await executeTrackerRun(runId, clientId, cursor, deadline);
+    const result = await executeTrackerRun(runId, clientId, cursor, deadline, undefined, e2eDeps());
     if (result.status === "paused") {
       // Re-enqueue from where we stopped.
       await enqueueTrackerJob({ runId, clientId, cursor: result.cursor });

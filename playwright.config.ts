@@ -11,6 +11,11 @@ const LOCAL_ENV = {
   DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
   CRON_SECRET: process.env.CRON_SECRET ?? "e2e-local-cron-secret-must-be-32chars!!",
   GEO_ORIGIN: "http://127.0.0.1:3050", // stubbed by tests via route interception
+  // The in-repo engine executes runs for real (fake providers, no network).
+  // CITATIONS_WORKER_BASE keeps the run route's local worker fallback ON this
+  // dev server — without it the default would point at prod.
+  E2E_FAKE_PROVIDERS: "1",
+  CITATIONS_WORKER_BASE: "http://127.0.0.1:3050/citations",
 };
 
 Object.assign(process.env, LOCAL_ENV);

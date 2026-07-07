@@ -20,32 +20,3 @@ export const getBalance = () =>
     return row.credit_balance as number;
   });
 
-/** Simulate geo's deployed worker completing a run with stored metrics. */
-export const completeRun = (runId: string) =>
-  withDb(
-    (sql) => sql`
-      UPDATE tracker.runs
-      SET status = 'complete', completed_at = now(), metrics = ${sql.json({
-        promptsTotal: 2,
-        citationRate: 0.5,
-        brandMentionRate: 1,
-        totalCitations: 3,
-        uniqueArticlesCited: 0,
-        newThisMonthCited: 0,
-        shareOfAiVoice: 0.75,
-        topCitedArticles: [],
-        platformBreakdown: [],
-        competitorMetrics: [],
-      })}
-      WHERE id = ${runId}
-    `,
-  );
-
-export const latestRunId = () =>
-  withDb(async (sql) => {
-    const [row] = await sql`
-      SELECT r.id FROM tracker.runs r WHERE r.org_id = ${"team_" + E2E.teamId}
-      ORDER BY r.created_at DESC LIMIT 1
-    `;
-    return row?.id as string | undefined;
-  });
