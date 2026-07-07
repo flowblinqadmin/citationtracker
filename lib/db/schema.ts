@@ -209,6 +209,22 @@ export const trackerResponses = trackerSchema.table("responses", {
 });
 
 
+// PCG's article lists (CSV/manual imports). Team brands have none — the
+// engine's URL matcher simply finds no article matches ('unmatched'). Mirrored
+// because the ported runner/run-metrics read it unconditionally.
+export const trackerArticles = trackerSchema.table("articles", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id").notNull(),
+  url: text("url").notNull(),
+  normalizedUrl: text("normalized_url").notNull(),
+  outlet: text("outlet"),
+  headline: text("headline"),
+  publishedAt: timestamp("published_at"),
+  source: text("source").notNull().default("manual"), // "manual" | "csv"
+  batchId: text("batch_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const trackerCitations = trackerSchema.table("citations", {
   id: text("id").primaryKey(),
   responseId: text("response_id"),

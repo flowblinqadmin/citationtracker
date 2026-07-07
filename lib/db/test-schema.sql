@@ -97,6 +97,12 @@ CREATE TABLE IF NOT EXISTS tracker.prompts (
   created_at timestamp DEFAULT now()
 );
 
+-- R22 (geo PR194, applied by CE migration 20260707-tracker-members-org-user-uniq
+-- at go-live): one accepted membership per (org, user).
+CREATE UNIQUE INDEX IF NOT EXISTS tracker_members_org_user_uniq
+  ON tracker.members(org_id, user_id)
+  WHERE user_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS tracker.prompt_versions (
   id text PRIMARY KEY,
   prompt_id text NOT NULL REFERENCES tracker.prompts(id) ON DELETE CASCADE,
@@ -105,6 +111,27 @@ CREATE TABLE IF NOT EXISTS tracker.prompt_versions (
   created_by text,
   created_at timestamp DEFAULT now()
 );
+
+-- geo migration 20260612 (in prod): immutable versioning key
+CREATE UNIQUE INDEX IF NOT EXISTS tracker_prompt_versions_prompt_version_uniq
+  ON tracker.prompt_versions (prompt_id, version);
+
+CREATE TABLE IF NOT EXISTS tracker.articles (
+  id text PRIMARY KEY,
+  client_id text NOT NULL REFERENCES tracker.clients(id) ON DELETE CASCADE,
+  url text NOT NULL,
+  normalized_url text NOT NULL,
+  outlet text,
+  headline text,
+  published_at timestamp,
+  source text NOT NULL DEFAULT 'manual',
+  batch_id text,
+  created_at timestamp DEFAULT now()
+);
+
+-- geo migration 20260612 (in prod): one article per normalized URL per client
+CREATE UNIQUE INDEX IF NOT EXISTS tracker_articles_client_norm_uniq
+  ON tracker.articles (client_id, normalized_url);
 
 CREATE TABLE IF NOT EXISTS tracker.runs (
   id text PRIMARY KEY,
@@ -148,6 +175,12 @@ CREATE TABLE IF NOT EXISTS tracker.responses (
   created_at timestamp DEFAULT now()
 );
 
+-- geo migration 20260612 (in prod): the engine's chunked-worker idempotency key.
+-- onConflictDoNothing on this index is what makes resume/re-delivery safe — the
+-- fixture MUST carry it or the runner-db tests would pass while prod dedupes.
+CREATE UNIQUE INDEX IF NOT EXISTS tracker_responses_run_pv_platform_attempt_uniq
+  ON tracker.responses (run_id, prompt_version_id, platform, attempt);
+
 -- Owned by the citation service (see lib/db/migrations/20260703-citation-checks.sql)
 CREATE TABLE IF NOT EXISTS citation_checks (
   citation_id   text PRIMARY KEY,
@@ -177,11 +210,13 @@ CREATE TABLE IF NOT EXISTS ai_search_snapshots (
 CREATE INDEX IF NOT EXISTS ai_search_snapshots_client_idx ON ai_search_snapshots (client_id);
 CREATE INDEX IF NOT EXISTS ai_search_snapshots_prompt_idx ON ai_search_snapshots (prompt_id, checked_at DESC);
 
+-- run_id/client_id CASCADE FKs: R27 (geo PR194, applied by CE migration
+-- 20260707-tracker-citations-fk-cascade at go-live).
 CREATE TABLE IF NOT EXISTS tracker.citations (
   id text PRIMARY KEY,
   response_id text REFERENCES tracker.responses(id) ON DELETE SET NULL,
-  run_id text NOT NULL,
-  client_id text NOT NULL,
+  run_id text NOT NULL REFERENCES tracker.runs(id) ON DELETE CASCADE,
+  client_id text NOT NULL REFERENCES tracker.clients(id) ON DELETE CASCADE,
   prompt_version_id text,
   platform text,
   raw_url text NOT NULL,

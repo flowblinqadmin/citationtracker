@@ -22,6 +22,7 @@ const MIRRORED_TABLES = [
   schema.trackerRuns,
   schema.trackerResponses,
   schema.trackerCitations,
+  schema.trackerArticles,
 ];
 
 describe.skipIf(!dbUrl)("schema drift (mirror vs information_schema)", () => {
@@ -71,6 +72,17 @@ describe.skipIf(!dbUrl)("schema drift (mirror vs information_schema)", () => {
     const rows = await db.execute(sql`
       SELECT indexname FROM pg_indexes
       WHERE tablename = 'credit_transactions' AND indexname = 'uq_credit_tx_citation_run_op'
+    `);
+    expect((rows as unknown as unknown[]).length).toBe(1);
+  });
+
+  it("the worker idempotency index on tracker.responses exists", async () => {
+    // The engine's onConflictDoNothing dedup (resume / QStash re-delivery)
+    // silently stops working if this index is missing.
+    const rows = await db.execute(sql`
+      SELECT indexname FROM pg_indexes
+      WHERE schemaname = 'tracker' AND tablename = 'responses'
+        AND indexname = 'tracker_responses_run_pv_platform_attempt_uniq'
     `);
     expect((rows as unknown as unknown[]).length).toBe(1);
   });
