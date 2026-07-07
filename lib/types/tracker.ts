@@ -73,7 +73,7 @@ export interface TrackerCompetitorMetric {
   totalCitations: number;
 }
 
-/** Aggregated metrics geo's worker stores on tracker_runs.metrics. */
+/** Aggregated metrics the engine stores on tracker_runs.metrics. */
 export interface TrackerRunMetrics {
   promptsTotal: number;
   citationRate: number;
@@ -81,7 +81,8 @@ export interface TrackerRunMetrics {
   totalCitations: number;
   uniqueArticlesCited: number;
   newThisMonthCited: number;
-  shareOfAiVoice: number;
+  /** client ÷ (client + competitor) citations; null when no contest (R24). */
+  shareOfAiVoice: number | null;
   topCitedArticles: TrackerTopArticle[];
   platformBreakdown: TrackerPlatformMetrics[];
   competitorMetrics: TrackerCompetitorMetric[];
