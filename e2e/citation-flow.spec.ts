@@ -1,9 +1,16 @@
 // The definition-of-done flow: login (shared Supabase session) → create brand
 // → library + custom prompts → cost preview → run debits credits → the
-// IN-REPO engine executes the run for real (E2E_FAKE_PROVIDERS stubs the four
-// providers; everything else — worker auth, runner, matching, sentiment,
-// metrics — is the production path) → results render → 402 upsell when broke
-// → unauthenticated redirect. All under the /citations basePath.
+// IN-REPO engine executes the run for real → results render → 402 upsell when
+// broke → unauthenticated redirect. All under the /citations basePath.
+//
+// What is REAL vs stubbed here: E2E_FAKE_PROVIDERS stubs the four provider
+// queryFns, the redirect resolver, AND the sentiment classifier (a fixed
+// 'positive'). So worker auth, the runner/worklist, URL matching, metrics,
+// billing, persistence, and polling are the production path; the Gemini
+// sentiment CLASSIFIER and redirect resolution are NOT exercised — the
+// sentiment assertion below verifies the classifier's result PROPAGATES to the
+// UI, not that classification is correct (that's covered by unit tests of
+// parseSentiment + the org-gating wiring).
 import { test, expect } from "@playwright/test";
 import { setBalance, getBalance } from "./helpers/db";
 import { E2E } from "./helpers/global-setup";
@@ -61,8 +68,10 @@ test("engine results surface: sentiment split and actual replies", async ({ page
   await page.goto("/citations");
   await page.getByRole("link", { name: new RegExp(brandName) }).click();
 
-  // Sentiment: classified 'positive' for every brand-mentioned reply by the
-  // e2e classifier stub — the Overview split shows a non-zero positive bucket.
+  // Sentiment PROPAGATION: the stubbed classifier returns 'positive' for every
+  // brand-mentioned reply, and the Overview split surfaces a non-zero positive
+  // bucket — proving the classifier result flows through persistence into the
+  // UI (not that the real Gemini classifier is correct).
   await expect(page.getByText(/\d+ positive/).first()).toBeVisible({ timeout: 15_000 });
 
   // Replies live on the Runs tab: the stored text is the provider fixture output.

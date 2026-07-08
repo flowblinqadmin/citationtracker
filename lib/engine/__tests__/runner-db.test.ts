@@ -275,4 +275,47 @@ describe.skipIf(!dbUrl)("executeTrackerRun (Postgres)", () => {
     expect(citations[0].normalizedUrl).toBe("real.example/acme-article");
     expect(citations[0].domain).toBe("real.example");
   });
+
+  // F5: the worker's tenancy helper resolves the AUTHORITATIVE org + client from
+  // the run row — the property the mocked worker test can't exercise.
+  it("runExecTarget returns the run's own org + client (and null for a missing run)", async () => {
+    const run = await createRun();
+    const target = await tdb.runExecTarget(run.id);
+    expect(target).toEqual({ orgId: `team_${TEAM}`, clientId });
+
+    await db.execute(sql`INSERT INTO tracker.orgs (id, name) VALUES ('org_pcg2', 'PCG')`);
+    await db.execute(sql`
+      INSERT INTO tracker.clients (id, org_id, name, status, run_frequency) VALUES ('tc_pcg2', 'org_pcg2', 'X', 'active', 'manual')
+    `);
+    await db.execute(sql`
+      INSERT INTO tracker.runs (id, client_id, org_id, period, kind, status) VALUES ('tr_pcg2', 'tc_pcg2', 'org_pcg2', '2026-07', 'manual', 'pending')
+    `);
+    expect(await tdb.runExecTarget("tr_pcg2")).toEqual({ orgId: "org_pcg2", clientId: "tc_pcg2" });
+    expect(await tdb.runExecTarget("tr_does_not_exist")).toBeNull();
+  });
+
+  // F6 / F2 (DB-safety): two workers executing the SAME run concurrently — the
+  // exact double-recovery race — must not double-write responses or citations.
+  // The tracker_responses_run_pv_platform_attempt_uniq index + R28 transaction
+  // make the loser's insert a no-op (this is the onConflictDoNothing branch the
+  // mock-based throttle test can't reach).
+  it("concurrent executeTrackerRun on one run does not double-write (dedup no-op path)", async () => {
+    const { deps } = makeDeps(() => ({
+      text: "Acme is great.", responseTimeMs: 1, citedUrls: ["https://x.example/a"],
+    }));
+    const run = await createRun(); // 2 prompts × 4 platforms = 8 pairs
+
+    const [a, b] = await Promise.all([
+      executeTrackerRun(run.id, clientId, 0, FAR_DEADLINE(), undefined, deps),
+      executeTrackerRun(run.id, clientId, 0, FAR_DEADLINE(), undefined, deps),
+    ]);
+    expect([a.status, b.status]).toContain("complete");
+
+    // Exactly one response per (pv, platform, attempt) pair — not doubled.
+    const responses = await responsesOf(run.id);
+    expect(responses).toHaveLength(8);
+    // And citations weren't written twice for the winning inserts.
+    const citations = await citationsOf(run.id);
+    expect(citations).toHaveLength(8);
+  });
 });

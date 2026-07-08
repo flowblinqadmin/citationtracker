@@ -770,14 +770,20 @@ export async function markRunCompleteIfPending(runId: string): Promise<void> {
     .where(and(eq(trackerRuns.id, runId), eq(trackerRuns.status, "pending")));
 }
 
-/** The org id that owns a run (for the worker's team-org execution guard), or null. */
-export async function runOrgId(runId: string): Promise<string | null> {
+/**
+ * The AUTHORITATIVE execution target of a run — its own org id and client id,
+ * read from the run row (never trust the worker payload's clientId). The worker
+ * uses this both to enforce the team-org guard AND to drive the runner, so a
+ * caller holding the shared CRON_SECRET can't pair a team run id with a PCG
+ * clientId to execute PCG prompts on our keys. null = run not found.
+ */
+export async function runExecTarget(runId: string): Promise<{ orgId: string; clientId: string } | null> {
   const [row] = await db
-    .select({ orgId: trackerRuns.orgId })
+    .select({ orgId: trackerRuns.orgId, clientId: trackerRuns.clientId })
     .from(trackerRuns)
     .where(eq(trackerRuns.id, runId))
     .limit(1);
-  return row?.orgId ?? null;
+  return row ?? null;
 }
 
 export async function deleteRunRow(runId: string): Promise<void> {

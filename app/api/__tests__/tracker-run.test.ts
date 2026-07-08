@@ -33,6 +33,10 @@ describe.skipIf(!dbUrl)("GET /api/cron/tracker-run (Postgres)", () => {
 
   beforeEach(async () => {
     process.env.CRON_SECRET = SECRET;
+    // These tests exercise the TAKEOVER behavior (jobs A + B) — the state after
+    // Phase C deletes geo's cron. During the transition (flag unset) A + B are
+    // deliberately skipped; that path has its own test below.
+    process.env.GEO_TRACKER_LIVE = "false";
     enqueueMock.mockClear();
     await db.execute(sql`DELETE FROM tracker.orgs`);
     await db.delete(schema.teams).where(eq(schema.teams.id, TEAM));
@@ -172,5 +176,45 @@ describe.skipIf(!dbUrl)("GET /api/cron/tracker-run (Postgres)", () => {
     await tdb.createPrompt(TEAM, brand.id, { name: "P1", category: "brand", text: "now?" });
     const manual = await tdb.createManualRunRow(TEAM, brand.id);
     expect(manual.kind).toBe("run");
+  });
+
+  // F2/F3/F4: during the transition (geo's cron still live), scheduling AND
+  // recovery are geo-owned — running them here too would double-recover stale
+  // runs onto two workers (double provider spend). Only the idempotent purge runs.
+  describe("transition: geo owns scheduling (GEO_TRACKER_LIVE unset)", () => {
+    beforeEach(() => {
+      delete process.env.GEO_TRACKER_LIVE;
+    });
+
+    it("skips scheduling + recovery, still purges, and reports geo-owned", async () => {
+      const clientId = await seedTeamBrand("monthly");
+      // A stale team run that CE would otherwise recover.
+      const staleAt = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+      await db.execute(sql`
+        INSERT INTO tracker.runs (id, client_id, org_id, period, kind, status, cursor, created_at)
+        VALUES ('tr_stale_transition', ${clientId}, ${"team_" + TEAM}, '2026-07', 'manual', 'running', 5, ${staleAt})
+      `);
+      // An old response body the purge should still remove.
+      const oldDate = new Date();
+      oldDate.setUTCMonth(oldDate.getUTCMonth() - 13);
+      await db.execute(sql`
+        INSERT INTO tracker.responses (id, run_id, client_id, prompt_version_id, platform, attempt, created_at)
+        SELECT 'trr_old_t', 'tr_stale_transition', ${clientId}, pv.id, 'openai', 1, ${oldDate.toISOString()}
+        FROM tracker.prompt_versions pv JOIN tracker.prompts p ON p.id = pv.prompt_id
+        WHERE p.client_id = ${clientId} LIMIT 1
+      `);
+
+      const res = await tick();
+      const body = await res.json();
+      expect(body.scheduling).toBe("geo-owned");
+      expect(body.started).toBe(0);
+      expect(body.recovered).toBe(0);
+      expect(body.purgedResponses).toBe(1); // purge still runs
+      expect(enqueueMock).not.toHaveBeenCalled(); // no double-recovery
+
+      // The due client was NOT scheduled (geo owns it during the transition).
+      const runs = await tdb.listRuns(TEAM, clientId);
+      expect(runs.some((r) => r.kind === "scheduled")).toBe(false);
+    });
   });
 });

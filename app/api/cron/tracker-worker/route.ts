@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Receiver } from "@upstash/qstash";
 import { executeTrackerRun, failRun, type RunnerDeps } from "@/lib/engine/runner";
 import { enqueueTrackerJob, trackerWorkerUrl, type TrackerJobPayload } from "@/lib/engine/enqueue";
-import { runOrgId } from "@/lib/tracker-db";
+import { runExecTarget } from "@/lib/tracker-db";
 import { cronBearerValid } from "@/lib/cron-auth";
 import { TRACKER_WORKER_DEADLINE_MS } from "@/lib/config";
 
@@ -90,21 +90,27 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
-  const { runId, clientId, cursor = 0 } = payload;
-  if (!runId || !clientId) {
-    return NextResponse.json({ error: "runId and clientId required" }, { status: 400 });
+  const { runId, cursor = 0 } = payload;
+  if (!runId) {
+    return NextResponse.json({ error: "runId required" }, { status: 400 });
   }
 
-  // Tenancy guard at the execution boundary: CE must NEVER execute a non-team
-  // (PCG) run on its own provider keys, whatever the enqueue path. The invariant
-  // is enforced at every enqueue site too, but CRON_SECRET is shared with geo —
-  // this closes the trust boundary against a misdirected/hostile authed caller.
-  // (null = run not found → let executeTrackerRun no-op it as 'skipped'.)
-  const orgId = await runOrgId(runId);
-  if (orgId && !orgId.startsWith("team_")) {
-    console.error("[tracker-worker] refusing non-team run:", runId, orgId);
+  // Tenancy guard at the execution boundary. Resolve the AUTHORITATIVE target
+  // (org + client) from the run row — never the payload's clientId. CE must
+  // NEVER execute a non-team (PCG) run on its own provider keys, and pairing a
+  // team run id with a foreign clientId must not be executable either (the
+  // runner keys prompts/persistence off clientId). CRON_SECRET is shared with
+  // geo, so this closes the trust boundary against a misdirected/hostile
+  // authed caller. null = run not found → nothing to execute.
+  const target = await runExecTarget(runId);
+  if (!target) {
+    return NextResponse.json({ ok: false, error: "run not found" });
+  }
+  if (!target.orgId.startsWith("team_")) {
+    console.error("[tracker-worker] refusing non-team run:", runId, target.orgId);
     return NextResponse.json({ ok: false, error: "non-team run refused" });
   }
+  const clientId = target.clientId;
 
   const deadline = Date.now() + TRACKER_WORKER_DEADLINE_MS;
 

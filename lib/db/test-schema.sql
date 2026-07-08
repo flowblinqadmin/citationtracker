@@ -211,12 +211,13 @@ CREATE INDEX IF NOT EXISTS ai_search_snapshots_client_idx ON ai_search_snapshots
 CREATE INDEX IF NOT EXISTS ai_search_snapshots_prompt_idx ON ai_search_snapshots (prompt_id, checked_at DESC);
 
 -- run_id/client_id CASCADE FKs: R27 (geo PR194, applied by CE migration
--- 20260707-tracker-citations-fk-cascade at go-live).
+-- 20260707-tracker-citations-fk-cascade at go-live). Named to MATCH the
+-- migration's constraint names so the schema-drift go-live check is meaningful.
 CREATE TABLE IF NOT EXISTS tracker.citations (
   id text PRIMARY KEY,
   response_id text REFERENCES tracker.responses(id) ON DELETE SET NULL,
-  run_id text NOT NULL REFERENCES tracker.runs(id) ON DELETE CASCADE,
-  client_id text NOT NULL REFERENCES tracker.clients(id) ON DELETE CASCADE,
+  run_id text NOT NULL,
+  client_id text NOT NULL,
   prompt_version_id text,
   platform text,
   raw_url text NOT NULL,
@@ -227,5 +228,7 @@ CREATE TABLE IF NOT EXISTS tracker.citations (
   article_id text,
   competitor_domain text,
   review_status text,
-  created_at timestamp DEFAULT now()
+  created_at timestamp DEFAULT now(),
+  CONSTRAINT tracker_citations_run_id_fk FOREIGN KEY (run_id) REFERENCES tracker.runs(id) ON DELETE CASCADE,
+  CONSTRAINT tracker_citations_client_id_fk FOREIGN KEY (client_id) REFERENCES tracker.clients(id) ON DELETE CASCADE
 );

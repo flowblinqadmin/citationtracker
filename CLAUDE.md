@@ -164,6 +164,7 @@ Keep `@supabase/*` versions in lockstep with geo (cookie format).
 | `QSTASH_CURRENT_SIGNING_KEY` / `QSTASH_NEXT_SIGNING_KEY` | Worker signature verification |
 | `CITATIONS_WORKER_BASE` | Public base of THIS service (direct vercel.app URL incl. /citations basePath) |
 | `FIRECRAWL_API_KEY` | Citation verification + AI Search scrapes |
+| `GEO_TRACKER_LIVE` | Transition switch. While unset/anything-but-`"false"`, the scheduler cron does ONLY the retention purge and leaves scheduling + recovery to geo's still-live cron. Phase C sets it `"false"` (CE takes over) in the SAME change that deletes geo's cron |
 
 Vercel project: `citationtracker` (adithya-raos-projects-ccfb49af).
 
@@ -214,3 +215,29 @@ inherited geo behavior or need Phase C before a safe fix. Track, don't silently
   once, then `fetch` resolves again — a rebinding host can pass the preflight and
   connect internally (blind SSRF). Ported byte-identical from geo PR#194 (parity-
   accepted there). Real fix is pinning the preflighted IP for the connection.
+- **Brand deletion orphans citations until go-live**: `deleteBrand` relies on the
+  `tracker.citations` run_id/client_id CASCADE FKs, which don't exist in prod
+  until the `20260707-tracker-citations-fk-cascade` migration is applied. Deleting
+  a brand with runs BEFORE go-live cascade-drops prompts/runs/responses but leaves
+  citation rows orphaned (dangling ids); the migration's R27a step purges exactly
+  those orphans at go-live. Pre-existing (deleteBrand predates the migration).
+
+## Go-live / Phase C checklist (transition ownership)
+
+Two crons run team clients during Phase B (CE deployed, geo tracker still up):
+geo's `:30` (no org filter — schedules AND executes team runs on GEO's keys) and
+CE's `:45`. CE's scheduler is deliberately **inert for scheduling + recovery**
+during this window (`GEO_TRACKER_LIVE` unset → purge only) because two crons
+recovering the same stale run to two workers double-spends provider budget
+(the DB writes dedupe via the unique index, but the provider CALLS already
+happened). CE owns manual runs (run route → CE worker → CE keys) throughout.
+
+Phase C, as ONE atomic change:
+1. Apply the two `20260707` tracker migrations to prod (citations FK cascade
+   incl. R27a orphan purge; members uniq). `npm test` drift check against prod
+   (read-only) will FAIL its go-live assertion until these land — that's the gate.
+2. Delete geo's tracker (cron, worker, routes, services) and push (approved).
+3. Set `GEO_TRACKER_LIVE=false` on citationtracker so CE's `:45` cron takes over
+   scheduling + recovery. Do this in lockstep with (2) — never a window where
+   both crons schedule (double-spend) or neither does (scheduled runs stop).
+4. After Phase C, safe to fix the weekly-period bug (CE is the sole scheduler).

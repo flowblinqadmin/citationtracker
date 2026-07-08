@@ -21,9 +21,9 @@ vi.mock("@/lib/engine/enqueue", async (importOriginal) => {
   };
 });
 
-const runOrgIdMock = vi.fn();
+const runExecTargetMock = vi.fn();
 vi.mock("@/lib/tracker-db", () => ({
-  runOrgId: (...args: unknown[]) => runOrgIdMock(...args),
+  runExecTarget: (...args: unknown[]) => runExecTargetMock(...args),
 }));
 
 const receiverVerifyMock = vi.fn();
@@ -52,7 +52,8 @@ beforeEach(() => {
   executeMock.mockReset().mockResolvedValue({ status: "complete", cursor: 3, processed: 3 });
   failRunMock.mockClear();
   enqueueMock.mockClear().mockResolvedValue(undefined);
-  runOrgIdMock.mockReset().mockResolvedValue("team_acme"); // team run by default
+  // team run by default; authoritative client id comes from the run row
+  runExecTargetMock.mockReset().mockResolvedValue({ orgId: "team_acme", clientId: "tc_1" });
   receiverVerifyMock.mockReset().mockResolvedValue(undefined);
 });
 
@@ -76,6 +77,17 @@ describe("POST /api/cron/tracker-worker — auth", () => {
     const [runId, clientId, cursor, deadline] = executeMock.mock.calls[0];
     expect([runId, clientId, cursor]).toEqual(["tr_1", "tc_1", 0]);
     expect(deadline).toBeGreaterThan(Date.now());
+  });
+
+  // F1: the runner must be driven by the run's AUTHORITATIVE clientId, never the
+  // payload's — a shared-secret caller can't pair a team run with a foreign client.
+  it("executes with the run's own clientId, ignoring a mismatched payload clientId", async () => {
+    runExecTargetMock.mockResolvedValue({ orgId: "team_acme", clientId: "tc_real" });
+    const forged = JSON.stringify({ runId: "tr_1", clientId: "tc_pcg_foreign", cursor: 0 });
+    const res = await call(forged, { authorization: `Bearer ${SECRET}` });
+    expect(res.status).toBe(200);
+    const [, clientId] = executeMock.mock.calls[0];
+    expect(clientId).toBe("tc_real"); // not the forged payload value
   });
 
   it("accepts a valid QStash signature, verified against the exact public worker URL", async () => {
@@ -150,7 +162,7 @@ describe("POST /api/cron/tracker-worker — dispatch", () => {
 
   // F7: the tenancy guard at the execution boundary.
   it("refuses a non-team (PCG) run without executing it", async () => {
-    runOrgIdMock.mockResolvedValue("org_pcg");
+    runExecTargetMock.mockResolvedValue({ orgId: "org_pcg", clientId: "tc_pcg" });
     const res = await call(goodPayload, auth);
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ ok: false, error: "non-team run refused" });
@@ -158,18 +170,18 @@ describe("POST /api/cron/tracker-worker — dispatch", () => {
   });
 
   it("executes when the run's org is a team org", async () => {
-    runOrgIdMock.mockResolvedValue("team_acme");
+    runExecTargetMock.mockResolvedValue({ orgId: "team_acme", clientId: "tc_1" });
     const res = await call(goodPayload, auth);
     expect(res.status).toBe(200);
     expect(executeMock).toHaveBeenCalledTimes(1);
   });
 
-  it("lets a missing run (null org) through to the runner's skip path", async () => {
-    runOrgIdMock.mockResolvedValue(null);
-    executeMock.mockResolvedValue({ status: "skipped", cursor: 0, processed: 0 });
+  it("refuses (does not execute) when the run does not exist", async () => {
+    runExecTargetMock.mockResolvedValue(null);
     const res = await call(goodPayload, auth);
     expect(res.status).toBe(200);
-    expect(executeMock).toHaveBeenCalledTimes(1);
+    expect(await res.json()).toMatchObject({ ok: false, error: "run not found" });
+    expect(executeMock).not.toHaveBeenCalled();
   });
 });
 

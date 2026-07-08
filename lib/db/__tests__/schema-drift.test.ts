@@ -86,4 +86,22 @@ describe.skipIf(!dbUrl)("schema drift (mirror vs information_schema)", () => {
     `);
     expect((rows as unknown as unknown[]).length).toBe(1);
   });
+
+  // Go-live gate: the two CE-owned 20260707 migrations. Present in the fixture
+  // and (after go-live) in prod. Pointing this test at prod BEFORE applying them
+  // will FAIL here — that is the intended pre-deploy reminder, not a false alarm.
+  it("the go-live tracker constraints exist (members uniq + citations cascade FKs)", async () => {
+    const idx = await db.execute(sql`
+      SELECT indexname FROM pg_indexes
+      WHERE schemaname = 'tracker' AND tablename = 'members'
+        AND indexname = 'tracker_members_org_user_uniq'
+    `);
+    expect((idx as unknown as unknown[]).length).toBe(1);
+
+    const fks = await db.execute(sql`
+      SELECT conname FROM pg_constraint
+      WHERE conname IN ('tracker_citations_run_id_fk', 'tracker_citations_client_id_fk')
+    `);
+    expect((fks as unknown as unknown[]).length).toBe(2);
+  });
 });
