@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { apiUrl } from "@/lib/api-url";
+import { normalizeDomain } from "@/lib/domain";
 import type { TrackerCompetitor } from "@/lib/types/tracker";
 
 const CARD = "#ffffff";
@@ -15,15 +16,12 @@ const ACCENT = "#b45309";
 const RED = "#dc2626";
 
 const MAX_COMPETITORS = 10;
-// Mirrors the route's zod competitorSchema — client-side preflight only.
-const DOMAIN_RE = /^[a-z0-9.-]+$/i;
 
 function rowError(row: TrackerCompetitor): string | null {
   if (!row.name.trim()) return "name required";
   if (row.name.length > 100) return "name too long";
-  const domain = row.domain.trim();
-  if (!domain) return "domain required";
-  if (domain.length > 253 || !DOMAIN_RE.test(domain) || !domain.includes(".")) return "invalid domain";
+  if (!row.domain.trim()) return "domain required";
+  if (!normalizeDomain(row.domain)) return "invalid domain";
   return null;
 }
 
@@ -51,12 +49,13 @@ export default function CompetitorEditor({
   }
 
   async function save() {
-    const cleaned = rows.map((r) => ({ name: r.name.trim(), domain: r.domain.trim().toLowerCase() }));
-    const bad = cleaned.map(rowError).find(Boolean);
+    const bad = rows.map(rowError).find(Boolean);
     if (bad) {
       toast.error(`Competitor ${bad}`);
       return;
     }
+    // Canonicalize each domain to a bare hostname (matches the server schema).
+    const cleaned = rows.map((r) => ({ name: r.name.trim(), domain: normalizeDomain(r.domain)! }));
     setSaving(true);
     try {
       const res = await fetch(apiUrl(`/api/brands/${clientId}`), {

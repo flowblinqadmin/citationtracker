@@ -6,6 +6,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { apiUrl } from "@/lib/api-url";
 import { GEO_ORIGIN } from "@/lib/config";
+import { normalizeDomain } from "@/lib/domain";
 
 interface Brand {
   id: string;
@@ -48,12 +49,20 @@ export default function BrandListPage() {
   async function createBrand(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !domain.trim()) return;
+    // Canonicalize what they typed (URL, www., trailing slash all welcome) so
+    // the field shows the clean hostname and we never bounce a paste-able URL.
+    const cleanDomain = normalizeDomain(domain);
+    if (!cleanDomain) {
+      toast.error("Enter a valid domain, e.g. acme.com");
+      return;
+    }
+    setDomain(cleanDomain);
     setCreating(true);
     try {
       const res = await fetch(apiUrl("/api/brands"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), domain: domain.trim() }),
+        body: JSON.stringify({ name: name.trim(), domain: cleanDomain }),
       });
       if (!res.ok) {
         toast.error((await res.json()).error ?? "Could not create brand");
