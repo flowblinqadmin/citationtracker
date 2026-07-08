@@ -13,6 +13,8 @@ import * as tdb from "@/lib/tracker-db";
 import { executeTrackerRun } from "@/lib/engine/runner";
 import { recomputeAndStoreRunMetrics } from "@/lib/engine/run-metrics";
 import { verifyCitationUrl } from "@/lib/citation-verify";
+import { citationRunCredits, debitForRun } from "@/lib/credits";
+import { CREDIT_USD } from "@/lib/pricing";
 import type { CitationCheckInput } from "@/lib/tracker-db";
 import { sql, eq } from "drizzle-orm";
 
@@ -36,7 +38,8 @@ describe.skipIf(!live)("LOCAL live smoke (real providers, local DB)", () => {
     const USER = "u_smoke";
 
     // ── Seed: team + org + brand + prompts (all LOCAL) ──────────────────────
-    await db.insert(schema.teams).values({ id: TEAM, name: "Smoke", ownerUserId: USER, creditBalance: 999 });
+    const START_BALANCE = 100;
+    await db.insert(schema.teams).values({ id: TEAM, name: "Smoke", ownerUserId: USER, creditBalance: START_BALANCE });
     const brand = await tdb.createBrand(TEAM, "Smoke", { name: BRAND, domain: DOMAIN });
     for (let i = 0; i < PROMPTS.length; i++) {
       await tdb.createPrompt(TEAM, brand.id, { name: `P${i + 1}`, category: "brand", text: PROMPTS[i] });
@@ -51,6 +54,23 @@ describe.skipIf(!live)("LOCAL live smoke (real providers, local DB)", () => {
     log(`  LIVE RUN — brand="${BRAND}" domain=${DOMAIN}  prompts=${PROMPTS.length}  platforms=4`);
     log(`  run=${runId}  team=${TEAM}  (local DB ${url.replace(/:[^:@]*@/, ":***@")})`);
     log("════════════════════════════════════════════════════════════════");
+
+    // ── PRICING: 2 credits per prompt per model ─────────────────────────────
+    log("\n── PRICING (2 credits per prompt per model, 1 credit = $0.10) ────");
+    for (const [np, pc] of [[1, 1], [1, 4], [2, 4], [10, 4], [30, 4]] as const) {
+      const cr = citationRunCredits(np, pc);
+      log(`  ${String(np).padStart(2)} prompt${np > 1 ? "s" : " "} × ${pc} model${pc > 1 ? "s" : " "} = ${String(cr).padStart(3)} credits  ($${(cr * CREDIT_USD).toFixed(2)})`);
+    }
+
+    // Real debit for THIS run through the actual billing path.
+    const cost = citationRunCredits(PROMPTS.length, 4);
+    const bal = () => db.select({ b: schema.teams.creditBalance }).from(schema.teams).where(eq(schema.teams.id, TEAM)).then((r) => r[0].b);
+    const before = await bal();
+    const debit = await debitForRun(TEAM, runId, cost);
+    const after = await bal();
+    log(`\n  THIS run: ${PROMPTS.length} prompts × 4 models = ${cost} credits ($${(cost * CREDIT_USD).toFixed(2)})`);
+    log(`  balance:  ${before} → ${after}   (debited ${cost}, applied=${debit.applied})`);
+    expect(after).toBe(before - cost);
 
     // ── Execute the REAL engine (no injected deps → real provider clients) ──
     const t0 = Date.now();
