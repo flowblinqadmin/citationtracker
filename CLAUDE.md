@@ -180,4 +180,37 @@ Vercel project: `citationtracker` (adithya-raos-projects-ccfb49af).
 - New API routes: middleware is default-deny — public routes must be added to
   `PUBLIC_PATHS` deliberately and covered in `middleware.test.ts`.
 - The scheduler must NEVER start or recover a non-team (PCG) run — their
-  prompts on our provider keys is a billing + tenancy breach (test-enforced).
+  prompts on our provider keys is a billing + tenancy breach (test-enforced,
+  and re-checked at the worker's execution boundary via `runOrgId`).
+
+## Known limitations (adversarial review 2026-07-07 — accepted / deferred)
+
+These survived the review but are NOT bugs this migration introduced — they are
+inherited geo behavior or need Phase C before a safe fix. Track, don't silently
+"fix" (a fix here can regress the transition window):
+
+- **Debit-snapshot vs execution-worklist divergence**: manual runs debit for the
+  prompt count at click time, but the runner executes the worklist rebuilt from
+  the current active prompts at execution time (`getActivePromptVersions`). If
+  prompts are added/archived (or a scoped prompt's text is edited → new version
+  id drops out of `scope.promptVersionIds`) between debit and execution, credits
+  charged can diverge from provider calls made. Window is seconds for a prompt
+  manual run; wider on pause/resume or stale recovery. Inherent to
+  debit-before-execute (pre-dates this migration). If it bites, the fix is to
+  re-price at execution from the actual worklist.
+- **Weekly frequency is effectively monthly**: `createScheduledRun` keys
+  idempotency on `(client_id, period)` with period = `YYYY-MM`, but weekly
+  clients advance `next_run_at` by +7d. Weeks 2–4 hit the existing period row and
+  no run is created. Pre-existing in geo. **Do not fix before Phase C** — changing
+  the period format for weekly desyncs from geo's still-live :30 cron (both would
+  create different-keyed rows → double execution). After geo's tracker is deleted,
+  switch weekly to a week-based period.
+- **Scheduler advance-before-create**: `advanceClientNextRun` runs before
+  `createScheduledRun`; if the create throws (DB hiccup), `next_run_at` is already
+  advanced and the client is skipped a cadence with no run row for recovery to
+  find. Deliberate geo design (prevents re-picking a persistently failing client
+  every tick). Errors land in the cron response `errors[]`.
+- **resolveRedirects DNS-rebinding TOCTOU**: the SSRF preflight resolves the host
+  once, then `fetch` resolves again — a rebinding host can pass the preflight and
+  connect internally (blind SSRF). Ported byte-identical from geo PR#194 (parity-
+  accepted there). Real fix is pinning the preflighted IP for the connection.

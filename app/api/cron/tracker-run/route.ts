@@ -24,6 +24,7 @@ import {
   advanceClientNextRun,
   listStaleTeamRuns,
   purgeOldResponses,
+  markRunCompleteIfPending,
 } from "@/lib/tracker-db";
 import { createScheduledRun, currentPeriod } from "@/lib/engine/run-create";
 import { enqueueTrackerJob } from "@/lib/engine/enqueue";
@@ -52,7 +53,13 @@ export async function GET(req: NextRequest) {
 
     try {
       const { run, promptVersions } = await createScheduledRun(client.id, client.orgId, currentPeriod(now));
-      if (promptVersions.length === 0) continue; // nothing to run this month
+      if (promptVersions.length === 0) {
+        // Nothing to run this period. createScheduledRun already inserted the
+        // row — settle it complete so stale recovery never executes it later
+        // (unbilled) and it doesn't block the brand's manual runs.
+        await markRunCompleteIfPending(run.id);
+        continue;
+      }
       if (run.status === "pending" || run.status === "failed") {
         await enqueueTrackerJob({ runId: run.id, clientId: client.id, cursor: run.cursor ?? 0 });
         result.started++;

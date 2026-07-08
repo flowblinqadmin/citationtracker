@@ -151,12 +151,26 @@ describe.skipIf(!dbUrl)("GET /api/cron/tracker-run (Postgres)", () => {
     expect(left.map((r) => r.id)).toEqual(["trr_new"]);
   });
 
-  it("skips enqueue for a due client with no active prompts", async () => {
+  // F1: a due client with 0 prompts must NOT leave a dangling pending run —
+  // stale recovery would later execute it against the then-current prompts
+  // unbilled (reconcile skips promptsTotal=0), and while pending it blocks the
+  // brand's manual runs. The scheduler settles it complete instead.
+  it("settles a due 0-prompt client's run complete, does not enqueue or leave it pending", async () => {
     const brand = await tdb.createBrand(TEAM, "Sched", { name: "Empty", domain: "empty.com", runFrequency: "monthly" });
     await db.execute(sql`UPDATE tracker.clients SET next_run_at = ${PAST} WHERE id = ${brand.id}`);
     const res = await tick();
     const body = await res.json();
     expect(body.started).toBe(0);
     expect(enqueueMock).not.toHaveBeenCalled();
+
+    const runs = await tdb.listRuns(TEAM, brand.id);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].status).toBe("complete"); // settled, not pending
+    expect(runs[0].promptsTotal).toBe(0);
+
+    // A subsequent manual run is NOT blocked by an in-flight row.
+    await tdb.createPrompt(TEAM, brand.id, { name: "P1", category: "brand", text: "now?" });
+    const manual = await tdb.createManualRunRow(TEAM, brand.id);
+    expect(manual.kind).toBe("run");
   });
 });

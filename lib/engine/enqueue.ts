@@ -46,6 +46,17 @@ export async function enqueueTrackerJob(
     return;
   }
 
+  // No QSTASH_TOKEN. In a DEPLOYED environment this is env drift, not local dev:
+  // the direct fallback below is fire-and-forget on a lambda that freezes right
+  // after the response, so the worker call frequently never lands — the run
+  // would be debited and never executed, with no error surfaced (the run
+  // route's refund path only fires when enqueue THROWS). Fail loud instead so
+  // the caller refunds and the misconfig is caught. (QStash also can't sign the
+  // request without a token, so there is no safe deployed path here anyway.)
+  if (process.env.VERCEL || process.env.NODE_ENV === "production") {
+    throw new Error("QSTASH_TOKEN is required in deployed environments — refusing the unreliable direct-call fallback");
+  }
+
   // Local dev fallback: call the worker directly, fire-and-forget (a chunk can
   // run for minutes; QStash delivery is async too, so callers must not depend
   // on completion). Auth via the shared cron secret.

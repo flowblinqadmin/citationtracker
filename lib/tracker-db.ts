@@ -756,6 +756,30 @@ export async function markRunFailed(runId: string, error: string): Promise<void>
   await db.update(trackerRuns).set({ status: "failed", error }).where(eq(trackerRuns.id, runId));
 }
 
+/**
+ * Mark a run complete with nothing executed — used by the scheduler when a due
+ * client has zero active prompts. Leaving such a run 'pending' would let stale
+ * recovery execute it (unbilled, since reconcile skips promptsTotal=0) and
+ * would block the brand's manual runs via the in-flight check. Guarded to
+ * pending so it never clobbers a run the worker is actively executing.
+ */
+export async function markRunCompleteIfPending(runId: string): Promise<void> {
+  await db
+    .update(trackerRuns)
+    .set({ status: "complete", completedAt: new Date() })
+    .where(and(eq(trackerRuns.id, runId), eq(trackerRuns.status, "pending")));
+}
+
+/** The org id that owns a run (for the worker's team-org execution guard), or null. */
+export async function runOrgId(runId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ orgId: trackerRuns.orgId })
+    .from(trackerRuns)
+    .where(eq(trackerRuns.id, runId))
+    .limit(1);
+  return row?.orgId ?? null;
+}
+
 export async function deleteRunRow(runId: string): Promise<void> {
   await db.delete(trackerRuns).where(eq(trackerRuns.id, runId));
 }
