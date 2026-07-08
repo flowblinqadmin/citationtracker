@@ -20,12 +20,12 @@ import { teams, creditTransactions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 describe("citationRunCredits", () => {
-  it("charges 1 credit per prompt per model", () => {
-    expect(citationRunCredits(1, 1)).toBe(1);
-    expect(citationRunCredits(1)).toBe(4); // all 4 models (incl. Claude)
-    expect(citationRunCredits(2)).toBe(8);
-    expect(citationRunCredits(10, 1)).toBe(10);
-    expect(citationRunCredits(30)).toBe(120);
+  it("charges 2 credits per prompt per model", () => {
+    expect(citationRunCredits(1, 1)).toBe(2);
+    expect(citationRunCredits(1)).toBe(8); // all 4 models (incl. Claude)
+    expect(citationRunCredits(2)).toBe(16);
+    expect(citationRunCredits(10, 1)).toBe(20);
+    expect(citationRunCredits(30)).toBe(240);
   });
 
   it("keeps the per-prompt-model price ≥ the priciest model's cost × margin", () => {

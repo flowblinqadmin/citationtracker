@@ -99,10 +99,13 @@ Node path on this machine: `/opt/homebrew/bin/node`.
 
 ## Credits & pricing
 
-- Flat 1 credit per prompt PER MODEL (1 credit = $0.10). Full 4-model run of
-  1 prompt = 4 credits; 1 prompt × 1 model = 1 credit. Constants in
-  `lib/pricing.ts`; a margin test asserts a credit covers the priciest model's
-  cost × 1.3 (`MODEL_COST_ESTIMATES` — review quarterly).
+- Flat 2 credits per prompt PER MODEL (1 credit = $0.10). Full 4-model run of
+  1 prompt = 8 credits; 1 prompt × 1 model = 2 credits. Constants in
+  `lib/pricing.ts` (`CREDITS_PER_PROMPT_MODEL = 2`); a margin test asserts the
+  per-prompt-model price covers the priciest model's cost × 1.3
+  (`MODEL_COST_ESTIMATES` — review quarterly). The wider 2-credit margin also
+  absorbs the un-billed per-run overhead (re-run-once, sentiment classification,
+  Firecrawl citation-verification + AI-search scrapes).
 - Brand domains are REQUIRED at creation: `isBrandMentioned` returns false
   without a domain (mentions + sentiment dead), and citation stats key on it.
   Citation figures shown in the UI come from `listRunsWithStats` /

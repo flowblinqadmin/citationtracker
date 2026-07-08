@@ -49,7 +49,7 @@ describe.skipIf(!dbUrl)("POST /api/brands/[id]/run (Postgres)", () => {
 
     const brand = await tdb.createBrand(TEAM, "Run Test", { name: "Acme" });
     clientId = brand.id;
-    // 10 prompts × 4 models → 40 credits (1 credit per prompt per model)
+    // 10 prompts × 4 models → 80 credits (2 credits per prompt per model)
     for (let i = 0; i < 10; i++) {
       await tdb.createPrompt(TEAM, clientId, { name: `P${i}`, category: "brand", text: `prompt ${i}` });
     }
@@ -68,8 +68,8 @@ describe.skipIf(!dbUrl)("POST /api/brands/[id]/run (Postgres)", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.started).toBe(true);
-    expect(body.credits).toBe(40);
-    expect(await balance()).toBe(60);
+    expect(body.credits).toBe(80);
+    expect(await balance()).toBe(20);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
@@ -87,7 +87,7 @@ describe.skipIf(!dbUrl)("POST /api/brands/[id]/run (Postgres)", () => {
     const res = await call();
     expect(res.status).toBe(402);
     const body = await res.json();
-    expect(body).toMatchObject({ error: "insufficient_credits", required: 40, balance: 2 });
+    expect(body).toMatchObject({ error: "insufficient_credits", required: 80, balance: 2 });
     expect(body.buyCreditsUrl).toContain("/dashboard");
     expect(await balance()).toBe(2);
     const runs = await tdb.listRuns(TEAM, clientId);
@@ -111,14 +111,14 @@ describe.skipIf(!dbUrl)("POST /api/brands/[id]/run (Postgres)", () => {
     const second = await call();
     expect(second.status).toBe(200);
     expect((await second.json()).alreadyRunning).toBe(true);
-    expect(await balance()).toBe(60); // charged once
+    expect(await balance()).toBe(20); // charged once (80)
   });
 
   it("double-submit race: concurrent POSTs yield exactly one charge and one run", async () => {
     const [a, b] = await Promise.all([call(), call()]);
     const statuses = [a.status, b.status].sort();
     expect(statuses[0]).toBeLessThanOrEqual(201);
-    expect(await balance()).toBe(60);
+    expect(await balance()).toBe(20); // charged once (80)
     const runs = await tdb.listRuns(TEAM, clientId);
     expect(runs.filter((r) => r.status === "pending")).toHaveLength(1);
   });
@@ -139,13 +139,13 @@ describe.skipIf(!dbUrl)("POST /api/brands/[id]/run (Postgres)", () => {
     expect(await balance()).toBe(100);
   });
 
-  it("scoped run: single prompt on a single platform costs 1 credit and stores scope", async () => {
+  it("scoped run: single prompt on a single platform costs 2 credits and stores scope", async () => {
     const prompts = await tdb.listPrompts(TEAM, clientId);
     const res = await call({ promptIds: [prompts[0].promptId], platforms: ["google"] });
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.credits).toBe(1);
-    expect(await balance()).toBe(99);
+    expect(body.credits).toBe(2);
+    expect(await balance()).toBe(98);
     expect(body.run.promptsTotal).toBe(1);
     expect(body.run.scope.platforms).toEqual(["google"]);
     expect(body.run.scope.promptVersionIds).toHaveLength(1);

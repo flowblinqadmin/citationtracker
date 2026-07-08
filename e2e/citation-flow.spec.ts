@@ -43,8 +43,8 @@ test("create brand → add prompts → cost preview", async ({ page }) => {
   await page.getByRole("button", { name: "Add custom" }).click();
   await expect(page.getByText("Which citation trackers do PR teams use?")).toBeVisible();
 
-  // 1 credit per prompt per model: 2 prompts × 4 models → 8 credits.
-  await expect(page.getByRole("button", { name: /Run now · 8 credits/ })).toBeVisible();
+  // 2 credits per prompt per model: 2 prompts × 4 models → 16 credits.
+  await expect(page.getByRole("button", { name: /Run now · 16 credits/ })).toBeVisible();
 });
 
 test("run now debits credits; the in-repo engine executes and completes the run", async ({ page }) => {
@@ -52,8 +52,8 @@ test("run now debits credits; the in-repo engine executes and completes the run"
   await page.getByRole("link", { name: new RegExp(brandName) }).click();
   await page.getByRole("button", { name: /Run now/ }).click();
 
-  await expect(page.getByText(/Run started — 8 credits/)).toBeVisible({ timeout: 15_000 }); // dev-server route compile on first hit
-  expect(await getBalance()).toBe(12);
+  await expect(page.getByText(/Run started — 16 credits/)).toBeVisible({ timeout: 15_000 }); // dev-server route compile on first hit
+  expect(await getBalance()).toBe(4);
 
   // The REAL worker + runner execute on this dev server (2 prompts × 4
   // platforms, fake providers). The 5s poll surfaces completion + metrics.
