@@ -171,6 +171,7 @@ Keep `@supabase/*` versions in lockstep with geo (cookie format).
 | `QSTASH_CURRENT_SIGNING_KEY` / `QSTASH_NEXT_SIGNING_KEY` | Worker signature verification |
 | `CITATIONS_WORKER_BASE` | Public base of THIS service (direct vercel.app URL incl. /citations basePath) |
 | `FIRECRAWL_API_KEY` | Citation verification + AI Search scrapes |
+| `AGENT_SERVICE_TOKEN` | Bearer secret for the stateless agent surface `POST /api/agent/one-shot-citation` (called by agent-storefront's x402 gateway). Constant-time compared; ≥32 chars (`openssl rand -hex 16`). Unset → route 503s. Distinct from `CRON_SECRET` — NOT shared with geo |
 | `GEO_TRACKER_LIVE` | Transition switch. While unset/anything-but-`"false"`, the scheduler cron does ONLY the retention purge and leaves scheduling + recovery to geo's still-live cron. Phase C sets it `"false"` (CE takes over) in the SAME change that deletes geo's cron |
 
 Vercel project: `citationtracker` (adithya-raos-projects-ccfb49af).
