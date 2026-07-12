@@ -6,7 +6,7 @@
 // Stats are computed live by matching tracker.citations against each URL's
 // normalized key, so a URL added after a run lights up retroactively (same
 // pattern as competitors). The editor full-replaces via PUT.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { apiUrl } from "@/lib/api-url";
 import { PLATFORM_LABEL, PLATFORM_ORDER } from "./platforms";
@@ -77,20 +77,35 @@ export default function TrackedUrlsEditor({ clientId }: { clientId: string }) {
   const [draft, setDraft] = useState<string[]>([]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  // A fast save() can complete before the mount GET's .then resolves; without a
+  // guard that stale GET would setUrls/setDraft back to the pre-save snapshot,
+  // silently discarding the just-saved edit. `superseded` flips true when a save
+  // succeeds, so the GET stands down permanently.
+  const supersededRef = useRef(false);
 
   useEffect(() => {
     // A network failure or a non-JSON body must not leave the card blank
     // forever: always flip `loaded`, and surface an inline error so the user
     // knows the widget didn't load rather than staring at an empty card.
+    let active = true; // false after unmount / clientId change
     void fetch(apiUrl(`/api/brands/${clientId}/tracked-urls`))
       .then(async (res) => {
         if (!res.ok) throw new Error(`tracked-urls GET ${res.status}`);
         const body = (await res.json()) as { urls: TrackedUrl[] };
+        // Never clobber a completed save (superseded) or a stale mount (inactive).
+        if (!active || supersededRef.current) return;
         setUrls(body.urls);
         setDraft(body.urls.map((u) => u.url));
       })
-      .catch(() => setLoadError(true))
-      .finally(() => setLoaded(true));
+      .catch(() => {
+        if (active && !supersededRef.current) setLoadError(true);
+      })
+      .finally(() => {
+        if (active) setLoaded(true);
+      });
+    return () => {
+      active = false;
+    };
   }, [clientId]);
 
   function update(i: number, value: string) {
@@ -121,6 +136,8 @@ export default function TrackedUrlsEditor({ clientId }: { clientId: string }) {
         toast.error(body?.error ?? "Could not save tracked URLs");
         return;
       }
+      // Mark the mount GET as superseded so an in-flight one can't overwrite this.
+      supersededRef.current = true;
       setUrls(body.urls);
       setDraft(body.urls.map((u) => u.url));
       setDirty(false);

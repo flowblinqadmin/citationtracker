@@ -73,13 +73,14 @@ describe.skipIf(!dbUrl)("tracker-db (Postgres)", () => {
       expect(still.name).toBe("Foreign Brand");
     });
 
-    it("deleteBrand removes the brand's tracked-URL articles (prod lacks the FK cascade)", async () => {
+    it("deleteBrand removes the brand's tracked-URL articles (belt-and-suspenders beside prod's cascade)", async () => {
       const brand = await tdb.createBrand(TEAM, "T", { name: "Acme", domain: "acme.com" });
       await tdb.replaceTrackedUrls(TEAM, brand.id, ["https://outlet.com/piece"]);
       expect(await tdb.listTrackedUrls(TEAM, brand.id)).toHaveLength(1);
       expect(await tdb.deleteBrand(TEAM, brand.id)).toBe(true);
       // Explicit delete in deleteBrand purges articles regardless of any client
-      // FK cascade (which does NOT exist on tracker.articles in prod).
+      // FK cascade (prod HAS one — verified 2026-07-11 — this pins the explicit
+      // delete so the function stays correct even without it).
       const left = await db
         .select()
         .from(schema.trackerArticles)
@@ -646,6 +647,56 @@ describe.skipIf(!dbUrl)("tracked publicity URLs (Postgres)", () => {
       const [still] = await db.select().from(schema.trackerArticles).where(eq(schema.trackerArticles.id, "ta_foreign"));
       expect(still.normalizedUrl).toBe("pcg.com/piece");
     });
+
+    it("concurrent DISJOINT replaces serialize: neither throws, final state is exactly one full set (never a 60-row union)", async () => {
+      // 30 + 30 disjoint URLs. On READ COMMITTED without the FOR UPDATE lock these
+      // could combine to 60 rows (over the cap) or 500 the loser on the unique
+      // index. The per-brand row lock serializes them to last-writer-wins.
+      const setA = Array.from({ length: 30 }, (_, i) => `https://a${i}.com/p`);
+      const setB = Array.from({ length: 30 }, (_, i) => `https://b${i}.com/p`);
+      // The two calls must not share a tx — the pool races them on separate conns.
+      const [rA, rB] = await Promise.all([
+        tdb.replaceTrackedUrls(TEAM, clientId, setA),
+        tdb.replaceTrackedUrls(TEAM, clientId, setB),
+      ]);
+      expect(rA).not.toBeNull();
+      expect(rB).not.toBeNull();
+      const list = await tdb.listTrackedUrls(TEAM, clientId);
+      expect(list).toHaveLength(30);
+      const keys = new Set(list.map((u) => u.normalizedUrl));
+      const isA = list.every((u) => u.normalizedUrl.startsWith("a"));
+      const isB = list.every((u) => u.normalizedUrl.startsWith("b"));
+      // Exactly one complete set survived — no partial merge across the two writes.
+      expect(isA || isB).toBe(true);
+      expect(keys.size).toBe(30);
+    });
+
+    it("concurrent OVERLAPPING replaces both resolve and settle on one complete set (no partial merge, no unique_violation)", async () => {
+      const shared = Array.from({ length: 20 }, (_, i) => `https://shared${i}.com/p`);
+      const setA = [...shared, "https://onlya.com/p"];
+      const setB = [...shared, "https://onlyb.com/p"];
+      const [rA, rB] = await Promise.all([
+        tdb.replaceTrackedUrls(TEAM, clientId, setA),
+        tdb.replaceTrackedUrls(TEAM, clientId, setB),
+      ]);
+      expect(rA).not.toBeNull();
+      expect(rB).not.toBeNull();
+      const list = await tdb.listTrackedUrls(TEAM, clientId);
+      expect(list).toHaveLength(21); // 20 shared + exactly one of the two unique tails
+      const hasA = list.some((u) => u.normalizedUrl === "onlya.com/p");
+      const hasB = list.some((u) => u.normalizedUrl === "onlyb.com/p");
+      // Exactly one unique tail present — the winner's set, whole and unmerged.
+      expect(hasA !== hasB).toBe(true);
+    });
+
+    it("echoes ITS OWN write: the returned urls match exactly what this call inserted", async () => {
+      const res = await tdb.replaceTrackedUrls(TEAM, clientId, [
+        "https://echo.com/a",
+        "https://echo.com/b",
+      ]);
+      expect(res).not.toBeNull();
+      expect(res!.urls.map((u) => u.normalizedUrl).sort()).toEqual(["echo.com/a", "echo.com/b"]);
+    });
   });
 
   describe("getTrackedUrlStats", () => {
@@ -705,6 +756,28 @@ describe.skipIf(!dbUrl)("tracked publicity URLs (Postgres)", () => {
       const list = await tdb.listTrackedUrls(TEAM, clientId);
       const s = (await tdb.getTrackedUrlStats(TEAM, clientId))[list[0].id];
       expect(s).toEqual({ exactCount: 0, domainCount: 0, platforms: [], lastCitedAt: null });
+    });
+
+    it("excludes NULL-platform citations from EVERY stat (exactCount, platforms, lastCitedAt, domainCount)", async () => {
+      // A degenerate/foreign row with platform=null must not be counted anywhere,
+      // else "Cited N×" (exactCount) would disagree with the platform chips.
+      await cite("c1", "outlet.com/piece", "outlet.com", "openai"); // exact, counted
+      await db.insert(schema.trackerCitations).values({
+        id: "c_null_exact", runId, clientId, promptVersionId, platform: null,
+        rawUrl: "https://outlet.com/piece", normalizedUrl: "outlet.com/piece", domain: "outlet.com", matchType: "unmatched",
+      });
+      await db.insert(schema.trackerCitations).values({
+        id: "c_null_domain", runId, clientId, promptVersionId, platform: null,
+        rawUrl: "https://outlet.com/other", normalizedUrl: "outlet.com/other", domain: "outlet.com", matchType: "unmatched",
+      });
+      await tdb.replaceTrackedUrls(TEAM, clientId, ["https://outlet.com/piece"]);
+
+      const list = await tdb.listTrackedUrls(TEAM, clientId);
+      const s = (await tdb.getTrackedUrlStats(TEAM, clientId))[list[0].id];
+      expect(s.exactCount).toBe(1); // c1 only; NULL-platform exact excluded
+      expect(s.platforms).toEqual(["openai"]);
+      expect(s.domainCount).toBe(0); // NULL-platform domain row excluded
+      expect(s.lastCitedAt).not.toBeNull();
     });
 
     it("cross-org: foreign team gets empty stats", async () => {

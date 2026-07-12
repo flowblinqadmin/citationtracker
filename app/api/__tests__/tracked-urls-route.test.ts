@@ -110,6 +110,41 @@ describe.skipIf(!dbUrl)("GET/PUT /api/brands/[id]/tracked-urls (Postgres)", () =
     expect((await putCall({ urls: [] })).status).toBe(401);
   });
 
+  it("500 with a structured JSON {error} body when replaceTrackedUrls throws unexpectedly", async () => {
+    const spy = vi.spyOn(tdb, "replaceTrackedUrls").mockRejectedValueOnce(new Error("boom"));
+    const res = await putCall({ urls: ["https://x.com/y"] });
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe("Could not save tracked URLs");
+    spy.mockRestore();
+  });
+
+  it("409 on a Postgres unique_violation (23505) from a raced save", async () => {
+    const err = Object.assign(new Error("duplicate key"), { code: "23505" });
+    const spy = vi.spyOn(tdb, "replaceTrackedUrls").mockRejectedValueOnce(err);
+    const res = await putCall({ urls: ["https://x.com/y"] });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/retry/i);
+    spy.mockRestore();
+  });
+
+  it("400 with the cap message when the 50-URL cap Error is thrown", async () => {
+    const spy = vi
+      .spyOn(tdb, "replaceTrackedUrls")
+      .mockRejectedValueOnce(new Error("A brand can track at most 50 URLs"));
+    const res = await putCall({ urls: ["https://x.com/y"] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/50/);
+    spy.mockRestore();
+  });
+
+  it("404 when replaceTrackedUrls raises an FK violation (23503)", async () => {
+    const err = Object.assign(new Error("fk violation"), { code: "23503" });
+    const spy = vi.spyOn(tdb, "replaceTrackedUrls").mockRejectedValueOnce(err);
+    const res = await putCall({ urls: ["https://x.com/y"] });
+    expect(res.status).toBe(404);
+    spy.mockRestore();
+  });
+
   it("404 for another team's brand (PUT), leaving it untouched", async () => {
     await db.execute(sql`INSERT INTO tracker.orgs (id, name) VALUES ('org_other_tracked', 'Other')`);
     await db.execute(sql`INSERT INTO tracker.clients (id, org_id, name) VALUES ('tc_other_tracked', 'org_other_tracked', 'X')`);

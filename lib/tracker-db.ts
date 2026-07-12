@@ -710,15 +710,27 @@ export interface ReplaceTrackedUrlsResult {
  * Full-replace the brand's tracked URLs (like the competitor save). Each input
  * is normalized to its canonical key; unparseable inputs are surfaced in
  * `rejected` and skipped. Deduped by normalized key. Capped at MAX_TRACKED_URLS.
- * Delete-then-insert runs in one transaction. Returns null on cross-org access.
+ * Returns null on cross-org access (or a concurrently-deleted brand).
+ *
+ * ALL work runs in ONE transaction whose FIRST statement is a `FOR UPDATE`
+ * ownership lock on the client row. That row lock serializes concurrent saves of
+ * the same brand, which closes three races on READ COMMITTED:
+ *  - overlapping saves no longer 500 the loser via a unique_violation on
+ *    tracker_articles_client_norm_uniq — they serialize; the loser re-runs its
+ *    delete+insert against the winner's committed state (last-writer-wins).
+ *  - concurrent DISJOINT saves can't combine to exceed the 50-row cap — the cap
+ *    check now operates on a serialized base, not two racing snapshots.
+ *  - save-vs-deleteBrand: deleteBrand's tx removes the client row, so a waiting
+ *    FOR UPDATE read here finds no row → null (404), not an FK 500.
+ * The returned `urls` are read INSIDE the same tx, so each caller echoes exactly
+ * what IT wrote — never another concurrent request's state.
  */
 export async function replaceTrackedUrls(
   teamId: string,
   clientId: string,
   urls: string[],
 ): Promise<ReplaceTrackedUrlsResult | null> {
-  const brand = await getBrand(teamId, clientId);
-  if (!brand) return null;
+  const orgId = orgIdForTeam(teamId);
 
   const rejected: string[] = [];
   const seen = new Set<string>();
@@ -739,7 +751,16 @@ export async function replaceTrackedUrls(
     toInsert.push({ url: trimmed, normalizedUrl: normalized });
   }
 
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
+    // Authoritative ownership gate + per-brand serialization lock. No row (wrong
+    // org, or the brand was deleted mid-save) → null, caller returns 404.
+    const [owned] = await tx
+      .select({ id: trackerClients.id })
+      .from(trackerClients)
+      .where(and(eq(trackerClients.id, clientId), eq(trackerClients.orgId, orgId)))
+      .for("update");
+    if (!owned) return null;
+
     await tx
       .delete(trackerArticles)
       .where(and(eq(trackerArticles.clientId, clientId), eq(trackerArticles.source, "manual")));
@@ -754,9 +775,22 @@ export async function replaceTrackedUrls(
         })),
       );
     }
-  });
 
-  return { urls: await listTrackedUrls(teamId, clientId), rejected };
+    // Echo own write from INSIDE the tx (same source='manual' predicate as
+    // listTrackedUrls), so the returned list is exactly this request's result.
+    const urlsOut = await tx
+      .select({
+        id: trackerArticles.id,
+        url: trackerArticles.url,
+        normalizedUrl: trackerArticles.normalizedUrl,
+        createdAt: trackerArticles.createdAt,
+      })
+      .from(trackerArticles)
+      .where(and(eq(trackerArticles.clientId, clientId), eq(trackerArticles.source, "manual")))
+      .orderBy(asc(trackerArticles.createdAt));
+
+    return { urls: urlsOut, rejected };
+  });
 }
 
 export interface TrackedUrlStats {
@@ -808,8 +842,13 @@ export async function listTrackedUrlsWithStats(
  * shared by getTrackedUrlStats and listTrackedUrlsWithStats. Assumes the list
  * was org-scoped at fetch time (both callers get it from listTrackedUrls, which
  * returns [] for cross-org brands, so an empty list yields {}).
+ *
+ * NULL-platform citations are excluded from EVERY stat (exactCount, platforms,
+ * lastCitedAt, domainCount): this service's engine always stamps a platform, so
+ * a NULL-platform row is degenerate/foreign. Counting it in exactCount while the
+ * platform-chip list filters it out is what let "Cited 3×" render only 2 chips.
  */
-async function trackedUrlStatsFor(
+export async function trackedUrlStatsFor(
   clientId: string,
   tracked: TrackedUrl[],
 ): Promise<Record<string, TrackedUrlStats>> {
@@ -834,6 +873,9 @@ async function trackedUrlStatsFor(
       and(
         eq(trackerCitations.clientId, clientId),
         inArray(trackerCitations.normalizedUrl, normalizedKeys),
+        // NULL-platform citations are degenerate here (our engine always stamps
+        // platform) and would inflate exactCount past the platform-chip count.
+        sql`${trackerCitations.platform} IS NOT NULL`,
         counted,
       ),
     )
@@ -854,6 +896,8 @@ async function trackedUrlStatsFor(
             eq(trackerCitations.clientId, clientId),
             inArray(trackerCitations.domain, domains),
             sql`${trackerCitations.normalizedUrl} NOT IN (${sql.join(normalizedKeys.map((k) => sql`${k}`), sql`, `)})`,
+            // Same exclusion as the exact query — keep domainCount consistent.
+            sql`${trackerCitations.platform} IS NOT NULL`,
             counted,
           ),
         )
