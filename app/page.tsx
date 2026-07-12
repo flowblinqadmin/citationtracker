@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { apiUrl } from "@/lib/api-url";
-import { GEO_ORIGIN } from "@/lib/config";
 import { normalizeDomain } from "@/lib/domain";
 
 interface Brand {
@@ -16,29 +15,19 @@ interface Brand {
   createdAt: string;
 }
 
-interface TeamInfo {
-  teamName: string;
-  creditBalance: number;
-}
-
 const CARD = "#ffffff";
 const BORDER = "1px solid rgba(0,0,0,0.08)";
 const MUTED = "#78716c";
 const ACCENT = "#b45309";
 
 export default function BrandListPage() {
-  const [team, setTeam] = useState<TeamInfo | null>(null);
   const [brands, setBrands] = useState<Brand[] | null>(null);
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
-    const [teamRes, brandsRes] = await Promise.all([
-      fetch(apiUrl("/api/teams/me")),
-      fetch(apiUrl("/api/brands")),
-    ]);
-    if (teamRes.ok) setTeam(await teamRes.json());
+    const brandsRes = await fetch(apiUrl("/api/brands"));
     if (brandsRes.ok) setBrands((await brandsRes.json()).brands);
   }, []);
 
@@ -79,23 +68,11 @@ export default function BrandListPage() {
 
   return (
     <main style={{ maxWidth: 860, margin: "0 auto", padding: "40px 24px" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 32 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 26 }}>Citations</h1>
-          <p style={{ margin: "6px 0 0", color: MUTED, fontSize: 14 }}>
-            Track how ChatGPT, Perplexity, and Gemini cite your brands.
-          </p>
-        </div>
-        <div style={{ textAlign: "right", fontSize: 14 }}>
-          <div style={{ color: MUTED }}>{team?.teamName ?? "…"}</div>
-          <div>
-            <strong style={{ color: (team?.creditBalance ?? 0) < 0 ? "#dc2626" : "inherit" }}>
-              {team ? `${team.creditBalance} credits` : "…"}
-            </strong>
-            {" · "}
-            <a href={`${GEO_ORIGIN}/dashboard`} style={{ color: ACCENT }}>Buy credits</a>
-          </div>
-        </div>
+      <header style={{ marginBottom: 32 }}>
+        <h1 style={{ margin: 0, fontSize: 26 }}>Citations</h1>
+        <p style={{ margin: "6px 0 0", color: MUTED, fontSize: 14 }}>
+          Track how ChatGPT, Perplexity, and Gemini cite your brands.
+        </p>
       </header>
 
       <form onSubmit={createBrand} style={{ display: "flex", gap: 8, marginBottom: 28 }}>

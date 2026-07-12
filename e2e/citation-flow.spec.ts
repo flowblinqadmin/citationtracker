@@ -24,7 +24,15 @@ test("basePath smoke: app serves under /citations with a valid session", async (
   await page.goto("/citations");
   await expect(page).toHaveURL(/\/citations/);
   await expect(page.getByRole("heading", { name: "Citations" })).toBeVisible();
+  // Credits now live in the shared global header chip (geo look-alike).
   await expect(page.getByText("20 credits")).toBeVisible();
+
+  // Global header makes geo + citations look like one product: the FLOWBLINQ
+  // GEO wordmark, an Audits link pointing at geo's dashboard (plain path, no
+  // /citations basePath prefix), and the signed-in user's email.
+  await expect(page.getByText("FLOWBLINQ GEO")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Audits" })).toHaveAttribute("href", "/dashboard");
+  await expect(page.getByText(E2E.email)).toBeVisible();
 });
 
 test("create brand → add prompts → cost preview", async ({ page }) => {

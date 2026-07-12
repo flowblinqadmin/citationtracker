@@ -8,6 +8,7 @@ export async function GET() {
   return NextResponse.json({
     teamId: ctx.teamId,
     teamName: ctx.teamName,
+    email: ctx.email, // for the global header (identity from x-user-email); may be null
     creditBalance: ctx.creditBalance,
     creditsPerPrompt: citationRunCredits(1), // full run: 1 prompt × 3 models
   });

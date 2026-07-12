@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
+import GeoHeader from "./GeoHeader";
+
+// Inter — matches geo's dashboard header font 1:1. Exposed as a CSS variable so
+// GeoHeader's FONT_STACK (var(--font-inter)) resolves to it.
+const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "FlowBlinq Citations — Track Your Brand Across AI",
@@ -11,8 +17,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={inter.variable}>
       <body>
+        <GeoHeader />
         {children}
         <Toaster theme="light" position="bottom-right" />
       </body>
