@@ -13,6 +13,7 @@ import { PROMPT_LIBRARY, PROMPT_CATEGORIES, fillTemplate } from "@/lib/prompt-li
 import type { TrackerRunMetrics, TrackerPromptCategory, TrackerRunFrequency, TrackerCompetitor } from "@/lib/types/tracker";
 import CompetitorEditor from "./CompetitorEditor";
 import TrackedUrlsEditor from "./TrackedUrlsEditor";
+import { PLATFORM_LABEL, PLATFORM_ORDER } from "./platforms";
 
 interface Brand {
   id: string;
@@ -120,9 +121,6 @@ interface HistoryRow {
   brandMentioned: boolean;
   sentiment: string | null;
 }
-
-const PLATFORM_LABEL: Record<string, string> = { openai: "ChatGPT", perplexity: "Perplexity", google: "Gemini", anthropic: "Claude" };
-const PLATFORM_ORDER = ["openai", "perplexity", "google", "anthropic"];
 
 const SENTIMENT_STYLE: Record<string, { color: string; bg: string; label: string }> = {
   positive: { color: GREEN, bg: "#f0fdf4", label: "positive" },

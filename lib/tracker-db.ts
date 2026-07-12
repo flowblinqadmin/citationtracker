@@ -304,6 +304,13 @@ const stripWww = (domain: string) => domain.trim().toLowerCase().replace(/^www\.
 const domainMatch = (column: typeof trackerCitations.domain, domain: string) =>
   sql`(${column} = ${domain} OR ${column} LIKE ${"%." + domain})`;
 
+// THE definition of "citations that count": a citation counts unless the
+// verification guard flagged it dead or as never mentioning the brand
+// (no_mention). NULL = not yet checked, still counts. Requires a LEFT JOIN to
+// citation_checks in the query. Shared by every stat that reports citation
+// numbers so they agree across the UI.
+const COUNTED_CITATION = sql`(${citationChecks.status} IS NULL OR ${citationChecks.status} NOT IN ('dead', 'no_mention'))`;
+
 export async function listRunsWithStats(teamId: string, clientId: string): Promise<RunWithStats[]> {
   const brand = await getBrand(teamId, clientId);
   if (!brand) return [];
@@ -319,9 +326,7 @@ export async function listRunsWithStats(teamId: string, clientId: string): Promi
     ? sql.join(competitorDomains.map((d) => domainMatch(trackerCitations.domain, d)), sql` OR `)
     : sql`false`;
 
-  // Citations flagged by the verification guard don't count: a dead link or a
-  // page that never mentions the brand is not a citation worth reporting.
-  const counted = sql`(${citationChecks.status} IS NULL OR ${citationChecks.status} NOT IN ('dead', 'no_mention'))`;
+  const counted = COUNTED_CITATION;
   const citeRows = await db
     .select({
       runId: trackerCitations.runId,
@@ -777,15 +782,43 @@ export async function getTrackedUrlStats(
   teamId: string,
   clientId: string,
 ): Promise<Record<string, TrackedUrlStats>> {
+  return trackedUrlStatsFor(clientId, await listTrackedUrls(teamId, clientId));
+}
+
+/**
+ * Tracked URLs joined with their live citation stats in a SINGLE list fetch —
+ * what the route serves. `getTrackedUrlStats` re-fetches the list internally, so
+ * callers that also need the list (the GET/PUT route) should use this instead to
+ * avoid running getBrand + the articles select twice.
+ */
+export async function listTrackedUrlsWithStats(
+  teamId: string,
+  clientId: string,
+): Promise<Array<TrackedUrl & { stats: TrackedUrlStats }>> {
   const tracked = await listTrackedUrls(teamId, clientId);
+  const stats = await trackedUrlStatsFor(clientId, tracked);
+  return tracked.map((u) => ({
+    ...u,
+    stats: stats[u.id] ?? { exactCount: 0, domainCount: 0, platforms: [], lastCitedAt: null },
+  }));
+}
+
+/**
+ * Stats computation over an ALREADY-FETCHED tracked list — the reusable core
+ * shared by getTrackedUrlStats and listTrackedUrlsWithStats. Assumes the list
+ * was org-scoped at fetch time (both callers get it from listTrackedUrls, which
+ * returns [] for cross-org brands, so an empty list yields {}).
+ */
+async function trackedUrlStatsFor(
+  clientId: string,
+  tracked: TrackedUrl[],
+): Promise<Record<string, TrackedUrlStats>> {
   if (tracked.length === 0) return {};
 
   const normalizedKeys = [...new Set(tracked.map((t) => t.normalizedUrl))];
   const domains = [...new Set(tracked.map((t) => extractRegistrableDomain(t.normalizedUrl)).filter((d): d is string => !!d))];
 
-  // Same exclusion predicate as the run stats: a dead link or a page that never
-  // mentions the brand is not a citation worth reporting.
-  const counted = sql`(${citationChecks.status} IS NULL OR ${citationChecks.status} NOT IN ('dead', 'no_mention'))`;
+  const counted = COUNTED_CITATION;
 
   // 1) Exact matches: group counted citations by normalized_url.
   const exactRows = await db

@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { apiUrl } from "@/lib/api-url";
+import { PLATFORM_LABEL, PLATFORM_ORDER } from "./platforms";
 
 const CARD = "#ffffff";
 const BORDER = "1px solid rgba(0,0,0,0.08)";
@@ -18,15 +19,6 @@ const GREEN = "#16a34a";
 const RED = "#dc2626";
 
 const MAX_TRACKED_URLS = 50;
-
-// Same platform label mapping used across the brand detail UI.
-const PLATFORM_LABEL: Record<string, string> = {
-  openai: "ChatGPT",
-  perplexity: "Perplexity",
-  google: "Gemini",
-  anthropic: "Claude",
-};
-const PLATFORM_ORDER = ["openai", "perplexity", "google", "anthropic"];
 
 interface TrackedUrlStats {
   exactCount: number;
@@ -81,19 +73,24 @@ function StatusBadge({ stats }: { stats: TrackedUrlStats }) {
 export default function TrackedUrlsEditor({ clientId }: { clientId: string }) {
   const [urls, setUrls] = useState<TrackedUrl[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    void fetch(apiUrl(`/api/brands/${clientId}/tracked-urls`)).then(async (res) => {
-      if (res.ok) {
+    // A network failure or a non-JSON body must not leave the card blank
+    // forever: always flip `loaded`, and surface an inline error so the user
+    // knows the widget didn't load rather than staring at an empty card.
+    void fetch(apiUrl(`/api/brands/${clientId}/tracked-urls`))
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`tracked-urls GET ${res.status}`);
         const body = (await res.json()) as { urls: TrackedUrl[] };
         setUrls(body.urls);
         setDraft(body.urls.map((u) => u.url));
-      }
-      setLoaded(true);
-    });
+      })
+      .catch(() => setLoadError(true))
+      .finally(() => setLoaded(true));
   }, [clientId]);
 
   function update(i: number, value: string) {
@@ -115,11 +112,15 @@ export default function TrackedUrlsEditor({ clientId }: { clientId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ urls: cleaned }),
       });
-      if (!res.ok) {
-        toast.error((await res.json()).error ?? "Could not save tracked URLs");
+      // Parse defensively: a 500 with an HTML/text body makes res.json() throw,
+      // which would otherwise swallow the error and fail silently.
+      const body = (await res.json().catch(() => null)) as
+        | { urls: TrackedUrl[]; rejected: string[]; error?: string }
+        | null;
+      if (!res.ok || !body) {
+        toast.error(body?.error ?? "Could not save tracked URLs");
         return;
       }
-      const body = (await res.json()) as { urls: TrackedUrl[]; rejected: string[] };
       setUrls(body.urls);
       setDraft(body.urls.map((u) => u.url));
       setDirty(false);
@@ -128,6 +129,9 @@ export default function TrackedUrlsEditor({ clientId }: { clientId: string }) {
       } else {
         toast.success("Tracked URLs saved — citation status updates as runs complete");
       }
+    } catch {
+      // A fetch rejection (network down / aborted) never reaches the block above.
+      toast.error("Could not save tracked URLs");
     } finally {
       setSaving(false);
     }
@@ -152,7 +156,13 @@ export default function TrackedUrlsEditor({ clientId }: { clientId: string }) {
         )}
       </div>
 
-      {loaded && draft.length === 0 && (
+      {loaded && loadError && (
+        <p style={{ color: RED, fontSize: 13, margin: "0 0 8px" }}>
+          Couldn&apos;t load tracked URLs — refresh to try again.
+        </p>
+      )}
+
+      {loaded && !loadError && draft.length === 0 && (
         <p style={{ color: MUTED, fontSize: 13, margin: "0 0 8px" }}>
           No tracked URLs yet. Add the exact article/page URLs you&apos;ve done PR on — past and future runs are matched
           against them, so citations light up retroactively.
