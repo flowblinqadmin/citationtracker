@@ -13,12 +13,17 @@ import {
   trackerRuns,
   trackerResponses,
   trackerCitations,
+  trackerArticles,
   citationChecks,
   aiSearchSnapshots,
   type TrackerClient,
   type TrackerRun,
   type CitationCheckStatus,
 } from "@/lib/db/schema";
+// Pure URL helpers from the engine's matcher. These are canonical-key functions
+// (no tracker.* schema imports), so importing them here does NOT trip the
+// architecture gate (which scans for tracker* SCHEMA symbols, not these).
+import { normalizeArticleUrl, extractRegistrableDomain } from "@/lib/engine/url-matcher";
 import type {
   TrackerCompetitor,
   TrackerPlatform,
@@ -133,11 +138,20 @@ export async function updateBrand(
 }
 
 export async function deleteBrand(teamId: string, clientId: string): Promise<boolean> {
-  const deleted = await db
-    .delete(trackerClients)
-    .where(and(eq(trackerClients.id, clientId), eq(trackerClients.orgId, orgIdForTeam(teamId))))
-    .returning({ id: trackerClients.id });
-  return deleted.length > 0;
+  // Verify ownership FIRST so we never touch another org's rows, then delete the
+  // client's tracker.articles explicitly. Prod DOES have articles_client_id_fkey
+  // ON DELETE CASCADE (verified against pg_constraint 2026-07-11), so this is
+  // belt-and-suspenders: deleteBrand stays correct even against a database
+  // missing that FK, at the cost of one no-op delete inside the transaction.
+  return db.transaction(async (tx) => {
+    const deleted = await tx
+      .delete(trackerClients)
+      .where(and(eq(trackerClients.id, clientId), eq(trackerClients.orgId, orgIdForTeam(teamId))))
+      .returning({ id: trackerClients.id });
+    if (deleted.length === 0) return false;
+    await tx.delete(trackerArticles).where(eq(trackerArticles.clientId, clientId));
+    return true;
+  });
 }
 
 // ── Prompts (identity + immutable versions, geo's model) ────────────────────
@@ -643,6 +657,191 @@ export async function latestAiSearchForBrand(teamId: string, clientId: string): 
       checkedAt: s.checkedAt,
     }];
   });
+}
+
+// ── Tracked publicity URLs (stored AS tracker.articles rows, source='manual') ─
+// Teams add press/blog/launch URLs they're doing PR on; the engine already loads
+// tracker.articles per client on every run and stamps each citation's match_type
+// + article_id (lib/engine/runner.ts). For the UI we compute citation stats LIVE
+// at query time by matching tracker.citations against the tracked URLs' normalized
+// keys (not the stored match_type) — so URLs added AFTER a run light up
+// retroactively (same pattern as competitor stats over tracker.citations).
+
+export const MAX_TRACKED_URLS = 50;
+
+export interface TrackedUrl {
+  id: string;
+  url: string;
+  normalizedUrl: string;
+  createdAt: Date | null;
+}
+
+/** The team's tracked publicity URLs for a brand, org-scoped. */
+export async function listTrackedUrls(teamId: string, clientId: string): Promise<TrackedUrl[]> {
+  const brand = await getBrand(teamId, clientId);
+  if (!brand) return [];
+  const rows = await db
+    .select({
+      id: trackerArticles.id,
+      url: trackerArticles.url,
+      normalizedUrl: trackerArticles.normalizedUrl,
+      createdAt: trackerArticles.createdAt,
+    })
+    .from(trackerArticles)
+    // source='manual' only: team-entered tracked URLs. Any other source (e.g. a
+    // future CSV import) must be invisible here and survive the full-replace.
+    .where(and(eq(trackerArticles.clientId, clientId), eq(trackerArticles.source, "manual")))
+    .orderBy(asc(trackerArticles.createdAt));
+  return rows;
+}
+
+export interface ReplaceTrackedUrlsResult {
+  urls: TrackedUrl[];
+  /** Input entries that could not be parsed into a canonical URL key. */
+  rejected: string[];
+}
+
+/**
+ * Full-replace the brand's tracked URLs (like the competitor save). Each input
+ * is normalized to its canonical key; unparseable inputs are surfaced in
+ * `rejected` and skipped. Deduped by normalized key. Capped at MAX_TRACKED_URLS.
+ * Delete-then-insert runs in one transaction. Returns null on cross-org access.
+ */
+export async function replaceTrackedUrls(
+  teamId: string,
+  clientId: string,
+  urls: string[],
+): Promise<ReplaceTrackedUrlsResult | null> {
+  const brand = await getBrand(teamId, clientId);
+  if (!brand) return null;
+
+  const rejected: string[] = [];
+  const seen = new Set<string>();
+  const toInsert: Array<{ url: string; normalizedUrl: string }> = [];
+  for (const raw of urls) {
+    const trimmed = typeof raw === "string" ? raw.trim() : "";
+    if (!trimmed) continue;
+    const normalized = normalizeArticleUrl(trimmed);
+    if (!normalized) {
+      rejected.push(raw);
+      continue;
+    }
+    if (seen.has(normalized)) continue; // dedupe by canonical key
+    seen.add(normalized);
+    if (toInsert.length >= MAX_TRACKED_URLS) {
+      throw new Error(`A brand can track at most ${MAX_TRACKED_URLS} URLs`);
+    }
+    toInsert.push({ url: trimmed, normalizedUrl: normalized });
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(trackerArticles)
+      .where(and(eq(trackerArticles.clientId, clientId), eq(trackerArticles.source, "manual")));
+    if (toInsert.length > 0) {
+      await tx.insert(trackerArticles).values(
+        toInsert.map((u) => ({
+          id: `ta_${nanoid()}`,
+          clientId,
+          url: u.url,
+          normalizedUrl: u.normalizedUrl,
+          source: "manual",
+        })),
+      );
+    }
+  });
+
+  return { urls: await listTrackedUrls(teamId, clientId), rejected };
+}
+
+export interface TrackedUrlStats {
+  /** Citations whose normalized_url equals this tracked URL's key (this exact page was cited). */
+  exactCount: number;
+  /** Distinct platforms citing this exact URL. */
+  platforms: string[];
+  /** Most recent citation of this exact URL. */
+  lastCitedAt: Date | null;
+  /** Citations sharing this URL's outlet domain but NOT the exact URL (outlet cited, different page). */
+  domainCount: number;
+}
+
+/**
+ * Per tracked URL, citation stats computed LIVE over tracker.citations for the
+ * client — retroactive by construction (URLs added after a run still match past
+ * citations). Guard-flagged citations (dead / no_mention in citation_checks) are
+ * excluded with the SAME predicate as listRunsWithStats/getRunTopSources so the
+ * numbers agree across the UI. exactCount and domainCount are disjoint: a
+ * citation of the exact URL counts only toward exactCount, never domainCount.
+ */
+export async function getTrackedUrlStats(
+  teamId: string,
+  clientId: string,
+): Promise<Record<string, TrackedUrlStats>> {
+  const tracked = await listTrackedUrls(teamId, clientId);
+  if (tracked.length === 0) return {};
+
+  const normalizedKeys = [...new Set(tracked.map((t) => t.normalizedUrl))];
+  const domains = [...new Set(tracked.map((t) => extractRegistrableDomain(t.normalizedUrl)).filter((d): d is string => !!d))];
+
+  // Same exclusion predicate as the run stats: a dead link or a page that never
+  // mentions the brand is not a citation worth reporting.
+  const counted = sql`(${citationChecks.status} IS NULL OR ${citationChecks.status} NOT IN ('dead', 'no_mention'))`;
+
+  // 1) Exact matches: group counted citations by normalized_url.
+  const exactRows = await db
+    .select({
+      normalizedUrl: trackerCitations.normalizedUrl,
+      count: sql<number>`count(distinct ${trackerCitations.id})::int`,
+      platforms: sql<Array<string | null> | null>`array_agg(distinct ${trackerCitations.platform}) filter (where ${trackerCitations.platform} is not null)`,
+      lastCitedAt: sql<Date | null>`max(${trackerCitations.createdAt})`,
+    })
+    .from(trackerCitations)
+    .leftJoin(citationChecks, eq(citationChecks.citationId, trackerCitations.id))
+    .where(
+      and(
+        eq(trackerCitations.clientId, clientId),
+        inArray(trackerCitations.normalizedUrl, normalizedKeys),
+        counted,
+      ),
+    )
+    .groupBy(trackerCitations.normalizedUrl);
+  const exactByKey = new Map(exactRows.map((r) => [r.normalizedUrl, r]));
+
+  // 2) Domain matches, EXCLUDING exact-URL citations (outlet cited, different page).
+  const domainRows = domains.length
+    ? await db
+        .select({
+          domain: trackerCitations.domain,
+          count: sql<number>`count(distinct ${trackerCitations.id})::int`,
+        })
+        .from(trackerCitations)
+        .leftJoin(citationChecks, eq(citationChecks.citationId, trackerCitations.id))
+        .where(
+          and(
+            eq(trackerCitations.clientId, clientId),
+            inArray(trackerCitations.domain, domains),
+            sql`${trackerCitations.normalizedUrl} NOT IN (${sql.join(normalizedKeys.map((k) => sql`${k}`), sql`, `)})`,
+            counted,
+          ),
+        )
+        .groupBy(trackerCitations.domain)
+    : [];
+  const domainByKey = new Map(domainRows.map((r) => [r.domain, r.count]));
+
+  const out: Record<string, TrackedUrlStats> = {};
+  for (const t of tracked) {
+    const exact = exactByKey.get(t.normalizedUrl);
+    const dom = extractRegistrableDomain(t.normalizedUrl);
+    // max(timestamp) comes back as a string from the driver — coerce to Date.
+    const last = exact?.lastCitedAt ?? null;
+    out[t.id] = {
+      exactCount: exact?.count ?? 0,
+      platforms: (exact?.platforms ?? []).filter((p): p is string => !!p),
+      lastCitedAt: last ? new Date(last) : null,
+      domainCount: dom ? domainByKey.get(dom) ?? 0 : 0,
+    };
+  }
+  return out;
 }
 
 export type ManualRunResult =

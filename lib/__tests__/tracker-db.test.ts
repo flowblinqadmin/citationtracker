@@ -73,6 +73,20 @@ describe.skipIf(!dbUrl)("tracker-db (Postgres)", () => {
       expect(still.name).toBe("Foreign Brand");
     });
 
+    it("deleteBrand removes the brand's tracked-URL articles (prod lacks the FK cascade)", async () => {
+      const brand = await tdb.createBrand(TEAM, "T", { name: "Acme", domain: "acme.com" });
+      await tdb.replaceTrackedUrls(TEAM, brand.id, ["https://outlet.com/piece"]);
+      expect(await tdb.listTrackedUrls(TEAM, brand.id)).toHaveLength(1);
+      expect(await tdb.deleteBrand(TEAM, brand.id)).toBe(true);
+      // Explicit delete in deleteBrand purges articles regardless of any client
+      // FK cascade (which does NOT exist on tracker.articles in prod).
+      const left = await db
+        .select()
+        .from(schema.trackerArticles)
+        .where(eq(schema.trackerArticles.clientId, brand.id));
+      expect(left).toHaveLength(0);
+    });
+
     it("sets nextRunAt when frequency is weekly and clears it for manual", async () => {
       const brand = await tdb.createBrand(TEAM, "T", { name: "A", runFrequency: "weekly" });
       expect(brand.nextRunAt).not.toBeNull();
@@ -515,6 +529,188 @@ describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
       const checks = await tdb.listRunCitationChecks(TEAM, clientId, runId);
       expect(checks["https://g2.com/products/other-flow"]).toBe("no_mention");
       expect(await tdb.listRunCitationChecks("tm_other_team", clientId, runId)).toEqual({});
+    });
+  });
+});
+
+describe.skipIf(!dbUrl)("tracked publicity URLs (Postgres)", () => {
+  const TEAM = "tm_tracked_urls";
+  const FOREIGN_ORG = "org_pcg_tracked";
+  let clientId: string;
+  let promptVersionId: string;
+  let runId: string;
+  let foreignClientId: string;
+
+  beforeEach(async () => {
+    await db.execute(sql`DELETE FROM tracker.orgs`);
+    await db.delete(schema.citationChecks);
+    await db.delete(schema.teams).where(eq(schema.teams.id, TEAM));
+    await db.insert(schema.teams).values({ id: TEAM, name: "TrackedURLs", ownerUserId: "u", creditBalance: 10 });
+
+    const b = await tdb.createBrand(TEAM, "TrackedURLs", { name: "Acme", domain: "acme.com" });
+    clientId = b.id;
+    const p = await tdb.createPrompt(TEAM, clientId, { name: "P", category: "brand", text: "What is Acme?" });
+    const [version] = await db
+      .select()
+      .from(schema.trackerPromptVersions)
+      .where(eq(schema.trackerPromptVersions.promptId, p.promptId));
+    promptVersionId = version.id;
+    // A real run row — citations FK-reference it (go-live cascade FK is applied).
+    const created = await tdb.createManualRunRow(TEAM, clientId);
+    if (created.kind !== "run") throw new Error("setup: expected run");
+    runId = created.run.id;
+
+    // Foreign (PCG-like) org + client with its OWN tracked-URL article — must be
+    // invisible and untouchable.
+    await db.insert(schema.trackerOrgs).values({ id: FOREIGN_ORG, name: "PCG" });
+    foreignClientId = "tc_pcg_tracked";
+    await db.insert(schema.trackerClients).values({ id: foreignClientId, orgId: FOREIGN_ORG, name: "PCG Brand", domain: "pcg.com" });
+    await db.insert(schema.trackerArticles).values({
+      id: "ta_foreign", clientId: foreignClientId, url: "https://pcg.com/piece", normalizedUrl: "pcg.com/piece", source: "manual",
+    });
+  });
+
+  // Insert a citation row directly (as geo's worker would). No run FK from
+  // citations, so a real run isn't required for these live-stat tests.
+  async function cite(id: string, normalizedUrl: string, domain: string, platform: "openai" | "google" | "perplexity" | "anthropic", createdAt?: Date) {
+    await db.insert(schema.trackerCitations).values({
+      id, runId, clientId, promptVersionId, platform,
+      rawUrl: `https://${normalizedUrl}`, normalizedUrl, domain, matchType: "unmatched",
+      ...(createdAt ? { createdAt } : {}),
+    });
+  }
+
+  describe("listTrackedUrls / replaceTrackedUrls", () => {
+    it("replace stores normalized keys, returns the list, org-scoped", async () => {
+      const res = await tdb.replaceTrackedUrls(TEAM, clientId, [
+        "https://www.outlet.com/My-Article?utm_source=x",
+      ]);
+      expect(res).not.toBeNull();
+      expect(res!.rejected).toEqual([]);
+      const list = await tdb.listTrackedUrls(TEAM, clientId);
+      expect(list).toHaveLength(1);
+      // www + utm stripped by the canonical normalizer.
+      expect(list[0].normalizedUrl).toBe("outlet.com/My-Article");
+      expect(list[0].url).toBe("https://www.outlet.com/My-Article?utm_source=x");
+    });
+
+    it("dedupes by normalized key (www/utm variants collapse)", async () => {
+      const res = await tdb.replaceTrackedUrls(TEAM, clientId, [
+        "https://outlet.com/piece",
+        "https://www.outlet.com/piece?utm_campaign=y",
+      ]);
+      expect((await tdb.listTrackedUrls(TEAM, clientId))).toHaveLength(1);
+      expect(res!.rejected).toEqual([]);
+    });
+
+    it("surfaces unparseable URLs in rejected and skips them", async () => {
+      const res = await tdb.replaceTrackedUrls(TEAM, clientId, [
+        "https://good.com/x",
+        "not a url",
+        "mailto:hi@nope.com",
+      ]);
+      expect(res!.rejected).toEqual(["not a url", "mailto:hi@nope.com"]);
+      expect(await tdb.listTrackedUrls(TEAM, clientId)).toHaveLength(1);
+    });
+
+    it("is a full replace (old URLs removed)", async () => {
+      await tdb.replaceTrackedUrls(TEAM, clientId, ["https://a.com/1", "https://b.com/2"]);
+      await tdb.replaceTrackedUrls(TEAM, clientId, ["https://c.com/3"]);
+      const list = await tdb.listTrackedUrls(TEAM, clientId);
+      expect(list.map((u) => u.normalizedUrl)).toEqual(["c.com/3"]);
+    });
+
+    it("caps at 50 URLs", async () => {
+      const many = Array.from({ length: 51 }, (_, i) => `https://outlet${i}.com/p`);
+      await expect(tdb.replaceTrackedUrls(TEAM, clientId, many)).rejects.toThrow(/50/);
+    });
+
+    it("non-manual articles are invisible and survive a full replace", async () => {
+      // A hypothetical future import path (source='csv') must never surface as a
+      // user-editable tracked URL, and a PUT full-replace must not wipe it.
+      await db.insert(schema.trackerArticles).values({
+        id: "ta_csv", clientId, url: "https://outlet.com/imported", normalizedUrl: "outlet.com/imported", source: "csv",
+      });
+      await tdb.replaceTrackedUrls(TEAM, clientId, ["https://outlet.com/tracked"]);
+      const list = await tdb.listTrackedUrls(TEAM, clientId);
+      expect(list.map((u) => u.normalizedUrl)).toEqual(["outlet.com/tracked"]);
+      const [csvRow] = await db.select().from(schema.trackerArticles).where(eq(schema.trackerArticles.id, "ta_csv"));
+      expect(csvRow.normalizedUrl).toBe("outlet.com/imported");
+      await db.delete(schema.trackerArticles).where(eq(schema.trackerArticles.id, "ta_csv"));
+    });
+
+    it("cross-org: cannot list/replace/leaks a foreign client's tracked URLs", async () => {
+      expect(await tdb.listTrackedUrls(TEAM, foreignClientId)).toEqual([]);
+      expect(await tdb.replaceTrackedUrls(TEAM, foreignClientId, ["https://x.com/y"])).toBeNull();
+      // foreign article untouched
+      const [still] = await db.select().from(schema.trackerArticles).where(eq(schema.trackerArticles.id, "ta_foreign"));
+      expect(still.normalizedUrl).toBe("pcg.com/piece");
+    });
+  });
+
+  describe("getTrackedUrlStats", () => {
+    it("counts exact citations, platforms, and lastCitedAt (RETROACTIVE: citations first, URL added after)", async () => {
+      // Citations exist BEFORE the URL is tracked — retroactive matching must still count them.
+      const early = new Date("2026-06-01T00:00:00Z");
+      const late = new Date("2026-06-10T00:00:00Z");
+      await cite("c1", "outlet.com/piece", "outlet.com", "openai", early);
+      await cite("c2", "outlet.com/piece", "outlet.com", "google", late);
+      await tdb.replaceTrackedUrls(TEAM, clientId, ["https://www.outlet.com/piece"]);
+
+      const list = await tdb.listTrackedUrls(TEAM, clientId);
+      const stats = await tdb.getTrackedUrlStats(TEAM, clientId);
+      const s = stats[list[0].id];
+      expect(s.exactCount).toBe(2);
+      expect([...s.platforms].sort()).toEqual(["google", "openai"]);
+      expect(s.domainCount).toBe(0);
+      // lastCitedAt is the MAX of the two citation timestamps (the later one).
+      // (created_at is a tz-naive timestamp; compare the wall-clock date, which
+      // is what the UI shows — avoids a driver-timezone-offset flake.)
+      expect(s.lastCitedAt).not.toBeNull();
+      expect(s.lastCitedAt!.getTime()).toBeGreaterThan(early.getTime());
+    });
+
+    it("splits exact vs domain: outlet cited on a DIFFERENT page counts as domainCount only", async () => {
+      await cite("c1", "outlet.com/piece", "outlet.com", "openai"); // exact
+      await cite("c2", "outlet.com/other", "outlet.com", "google"); // same outlet, different page
+      await cite("c3", "outlet.com/third", "outlet.com", "perplexity"); // same outlet, different page
+      await tdb.replaceTrackedUrls(TEAM, clientId, ["https://outlet.com/piece"]);
+
+      const list = await tdb.listTrackedUrls(TEAM, clientId);
+      const s = (await tdb.getTrackedUrlStats(TEAM, clientId))[list[0].id];
+      expect(s.exactCount).toBe(1);
+      expect(s.domainCount).toBe(2); // the two other pages of the same outlet
+    });
+
+    it("excludes guard-flagged (dead / no_mention) citations from both counts", async () => {
+      await cite("c1", "outlet.com/piece", "outlet.com", "openai"); // exact, counted
+      await cite("c2", "outlet.com/piece", "outlet.com", "google");  // exact, will be no_mention
+      await cite("c3", "outlet.com/other", "outlet.com", "perplexity"); // domain, will be dead
+      await cite("c4", "outlet.com/third", "outlet.com", "anthropic"); // domain, counted
+      await tdb.recordCitationChecks([
+        { citationId: "c2", runId, clientId, url: "https://outlet.com/piece", status: "no_mention", brandMatched: false },
+        { citationId: "c3", runId, clientId, url: "https://outlet.com/other", status: "dead" },
+      ]);
+      await tdb.replaceTrackedUrls(TEAM, clientId, ["https://outlet.com/piece"]);
+
+      const list = await tdb.listTrackedUrls(TEAM, clientId);
+      const s = (await tdb.getTrackedUrlStats(TEAM, clientId))[list[0].id];
+      expect(s.exactCount).toBe(1); // c1 only; c2 excluded (no_mention)
+      expect(s.platforms).toEqual(["openai"]);
+      expect(s.domainCount).toBe(1); // c4 only; c3 excluded (dead)
+    });
+
+    it("returns zeros for an uncited tracked URL", async () => {
+      await tdb.replaceTrackedUrls(TEAM, clientId, ["https://never.com/cited"]);
+      const list = await tdb.listTrackedUrls(TEAM, clientId);
+      const s = (await tdb.getTrackedUrlStats(TEAM, clientId))[list[0].id];
+      expect(s).toEqual({ exactCount: 0, domainCount: 0, platforms: [], lastCitedAt: null });
+    });
+
+    it("cross-org: foreign team gets empty stats", async () => {
+      await cite("c1", "outlet.com/piece", "outlet.com", "openai");
+      await tdb.replaceTrackedUrls(TEAM, clientId, ["https://outlet.com/piece"]);
+      expect(await tdb.getTrackedUrlStats("tm_other_team", clientId)).toEqual({});
     });
   });
 });

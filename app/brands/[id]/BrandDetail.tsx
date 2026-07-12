@@ -12,6 +12,7 @@ import { citationRunCredits } from "@/lib/pricing";
 import { PROMPT_LIBRARY, PROMPT_CATEGORIES, fillTemplate } from "@/lib/prompt-library";
 import type { TrackerRunMetrics, TrackerPromptCategory, TrackerRunFrequency, TrackerCompetitor } from "@/lib/types/tracker";
 import CompetitorEditor from "./CompetitorEditor";
+import TrackedUrlsEditor from "./TrackedUrlsEditor";
 
 interface Brand {
   id: string;
@@ -790,6 +791,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
               onSaved={load}
             />
           )}
+          {brand && <TrackedUrlsEditor clientId={clientId} />}
         </section>
       )}
 
