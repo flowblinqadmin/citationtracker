@@ -22,9 +22,12 @@ const brandName = `E2E Brand ${Date.now()}`;
 
 test("basePath smoke: app serves under /citations with a valid session", async ({ page }) => {
   await page.goto("/citations");
-  await expect(page).toHaveURL(/\/citations/);
-  await expect(page.getByRole("heading", { name: "Citations" })).toBeVisible();
-  // Credits now live in the shared global header chip (geo look-alike).
+  // A brand-less team is routed straight into the onboarding wizard — that IS
+  // the landing experience now; the brand list renders only once brands exist.
+  await expect(page).toHaveURL(/\/citations\/onboarding/);
+  await expect(page.getByRole("heading", { name: /let.?s set up your brand/i })).toBeVisible();
+  // Credits live in the shared global header chip (geo look-alike), rendered
+  // at layout level — visible on the wizard too.
   await expect(page.getByText("20 credits")).toBeVisible();
 
   // Global header makes geo + citations look like one product: the FLOWBLINQ
@@ -36,10 +39,16 @@ test("basePath smoke: app serves under /citations with a valid session", async (
 });
 
 test("create brand → add prompts → cost preview", async ({ page }) => {
+  // Brand creation UI is now the onboarding wizard (covered end-to-end by
+  // onboarding.spec.ts). This suite seeds its brand through the API — the
+  // same endpoint the wizard's commit sequence calls — and focuses on the
+  // brand-detail management surface.
+  const created = await page.request.post("/citations/api/brands", {
+    data: { name: brandName, domain: "acme-e2e.com" },
+  });
+  expect(created.status()).toBe(201);
+
   await page.goto("/citations");
-  await page.getByPlaceholder("Brand name (e.g. Acme)").fill(brandName);
-  await page.getByPlaceholder("Domain (e.g. acme.com)").fill("acme-e2e.com");
-  await page.getByRole("button", { name: "Add brand" }).click();
   await page.getByRole("link", { name: new RegExp(brandName) }).click();
 
   // One library prompt (token filled with the brand name) + one custom.
@@ -105,7 +114,9 @@ test("competitor editor: saved competitors persist and SoAV lights up retroactiv
   // Persisted across reload, and the ALREADY-completed run's citations now
   // split brand vs competitor (fixture cites one of each per reply → 50%).
   await page.reload();
-  await expect(page.getByPlaceholder("Domain (e.g. apollo.com)")).toHaveValue("thirdparty.example");
+  // 15s like the run test: a full document reload can hit the dev server's
+  // on-demand recompile (slow on symlinked-node_modules worktrees).
+  await expect(page.getByPlaceholder("Domain (e.g. apollo.com)")).toHaveValue("thirdparty.example", { timeout: 15_000 });
   const soavAfter = page.getByText("Share of AI voice", { exact: true }).locator("..");
   await expect(soavAfter.getByText("50%")).toBeVisible();
 });

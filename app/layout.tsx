@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 import GeoHeader from "./GeoHeader";
+import { GEO_ORIGIN } from "@/lib/config";
 
 // Inter — matches geo's dashboard header font 1:1. Exposed as a CSS variable so
 // GeoHeader's FONT_STACK (var(--font-inter)) resolves to it.
@@ -19,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={inter.variable}>
       <body>
-        <GeoHeader />
+        <GeoHeader geoOrigin={GEO_ORIGIN} />
         {children}
         <Toaster theme="light" position="bottom-right" />
       </body>

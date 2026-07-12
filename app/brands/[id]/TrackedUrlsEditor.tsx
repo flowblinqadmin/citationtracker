@@ -181,8 +181,7 @@ export default function TrackedUrlsEditor({ clientId }: { clientId: string }) {
 
       {loaded && !loadError && draft.length === 0 && (
         <p style={{ color: MUTED, fontSize: 13, margin: "0 0 8px" }}>
-          No tracked URLs yet. Add the exact article/page URLs you&apos;ve done PR on — past and future runs are matched
-          against them, so citations light up retroactively.
+          No tracked URLs yet — add the pages you&apos;re pitching to press and we&apos;ll flag when AI cites them.
         </p>
       )}
 

@@ -72,6 +72,7 @@ describe("session-gated paths — unauthenticated", () => {
 
   it.each([
     "/api/brands",
+    "/api/brands/suggest",
     "/api/brands/cl_1/prompts",
     "/api/brands/cl_1/run",
     "/api/teams/me",

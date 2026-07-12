@@ -24,6 +24,10 @@ export default defineConfig({
   testDir: "./e2e",
   globalSetup: "./e2e/helpers/global-setup.ts",
   fullyParallel: false,
+  // One worker: every spec file shares this single dev server + Postgres, and
+  // the fake-provider runs are heavy enough that concurrent files starve each
+  // other's timeouts (teams are isolated per file, but the server is not).
+  workers: 1,
   retries: 0,
   reporter: [["list"]],
   use: {
@@ -32,7 +36,9 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "npx next dev -p 3050",
+    // Next 16 defaults `next dev` to Turbopack, which PANICS on this worktree's
+    // symlinked node_modules — pin --webpack for local e2e only.
+    command: "npx next dev --webpack -p 3050",
     url: "http://127.0.0.1:3050/citations/icon.svg", // public path — pages 307 to login unauthenticated
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,

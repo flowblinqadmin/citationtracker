@@ -1182,6 +1182,7 @@ export interface RunResponseRow {
   citedUrls: string[];
   brandMentioned: boolean;
   sentiment: string | null;
+  error: string | null;
   createdAt: Date | null;
 }
 
@@ -1241,6 +1242,7 @@ export async function listRunResponses(
       citedUrls: trackerResponses.citedUrls,
       brandMentioned: trackerResponses.brandMentioned,
       sentiment: trackerResponses.sentiment,
+      error: trackerResponses.error,
       createdAt: trackerResponses.createdAt,
     })
     .from(trackerResponses)

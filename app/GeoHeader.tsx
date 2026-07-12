@@ -14,7 +14,6 @@
 
 import { useEffect, useState } from "react";
 import { apiUrl } from "@/lib/api-url";
-import { GEO_ORIGIN } from "@/lib/config";
 import { createClient } from "@/lib/supabase/client";
 
 // ── geo design-system constants (copied 1:1 from geo dashboard) ──────────────
@@ -46,7 +45,11 @@ async function handleSignOut() {
   window.location.href = "/";
 }
 
-export default function GeoHeader() {
+// geoOrigin comes from the SERVER layout: GEO_ORIGIN reads a non-NEXT_PUBLIC
+// env var, so evaluating it inside this client component gives the server the
+// real value and the browser bundle only the fallback — a hydration mismatch
+// wherever they differ (e2e, staging). A serialized prop is identical on both.
+export default function GeoHeader({ geoOrigin }: { geoOrigin: string }) {
   const [team, setTeam] = useState<TeamInfo | null>(null);
 
   useEffect(() => {
@@ -99,7 +102,7 @@ export default function GeoHeader() {
         <span style={{ fontSize: 13, color: T2 }}>{team?.email ?? ""}</span>
         {/* Credits chip → geo's buy-credits flow (same target the old page header used). */}
         <a
-          href={`${GEO_ORIGIN}/dashboard`}
+          href={`${geoOrigin}/dashboard`}
           style={{
             background: COPPER,
             color: "#fff",

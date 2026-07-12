@@ -12,6 +12,7 @@ import { citationRunCredits } from "@/lib/pricing";
 import { PROMPT_LIBRARY, PROMPT_CATEGORIES, fillTemplate } from "@/lib/prompt-library";
 import type { TrackerRunMetrics, TrackerPromptCategory, TrackerRunFrequency, TrackerCompetitor } from "@/lib/types/tracker";
 import CompetitorEditor from "./CompetitorEditor";
+import GettingStarted from "./GettingStarted";
 import TrackedUrlsEditor from "./TrackedUrlsEditor";
 import { PLATFORM_LABEL, PLATFORM_ORDER } from "./platforms";
 
@@ -629,6 +630,15 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
 
       {tab === "overview" && (
         <section>
+          {brand && (
+            <GettingStarted
+              brandId={clientId}
+              hasCompetitors={(brand.competitors?.length ?? 0) > 0}
+              hasRuns={runs.length > 0}
+              runFrequency={brand.runFrequency}
+              onNavigateTab={setTab}
+            />
+          )}
           {!latestComplete ? (
             <p style={{ color: MUTED, fontSize: 14 }}>
               No completed runs yet — add prompts and run them to see the dashboard.
@@ -902,7 +912,10 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
               </div>
             )}
             {prompts.length === 0 && (
-              <p style={{ color: MUTED, fontSize: 14 }}>No prompts yet — add a few from the library to get started.</p>
+              <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.5 }}>
+                No prompts yet — prompts are the questions we ask ChatGPT, Perplexity, Gemini and Claude to
+                see if they mention you. Add from the library below or write your own.
+              </p>
             )}
           </div>
         </section>
@@ -910,7 +923,11 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
 
       {tab === "runs" && (
         <section style={{ display: "grid", gap: 10 }}>
-          {runs.length === 0 && <p style={{ color: MUTED, fontSize: 14 }}>No runs yet.</p>}
+          {runs.length === 0 && (
+            <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.5 }}>
+              No reports yet — run your first report to see where AI mentions your brand and which sources it cites.
+            </p>
+          )}
           {runs.map((r) => (
             <div key={r.id} style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 18px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>

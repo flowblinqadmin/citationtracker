@@ -313,7 +313,25 @@ describe.skipIf(!dbUrl)("responses & history (Postgres)", () => {
       platform: "openai",
       responseText: "Acme is a company.",
       brandMentioned: true,
+      error: null,
     });
+  });
+
+  it("round-trips a response's error so failed calls stay distinguishable from real gaps", async () => {
+    const [version] = await db
+      .select()
+      .from(schema.trackerPromptVersions)
+      .where(eq(schema.trackerPromptVersions.promptId, promptId));
+    await db.insert(schema.trackerResponses).values({
+      id: "resp_errored", runId, clientId, promptVersionId: version.id,
+      platform: "perplexity", attempt: 1, responseText: null,
+      citedUrls: [], brandMentioned: false, error: "provider timeout",
+    });
+    const rows = await tdb.listRunResponses(TEAM, clientId, runId);
+    const errored = rows.find((r) => r.platform === "perplexity")!;
+    expect(errored.error).toBe("provider timeout");
+    // The healthy openai row still reports no error.
+    expect(rows.find((r) => r.platform === "openai")!.error).toBeNull();
   });
 
   it("lists a prompt's reply history across runs", async () => {
