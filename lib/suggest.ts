@@ -28,9 +28,11 @@ const SCRAPE_TIMEOUT_MS = 15_000;
 const LLM_TIMEOUT_MS = 15_000;
 
 // Gemini model + token cap. The maxOutputTokens gotcha: thinking tokens spend
-// the budget first, so small caps return empty MAX_TOKENS responses. Use ≥1024.
+// the budget first. Measured 2026-07-12: this JSON request thinks ~1k tokens
+// before emitting a byte, so 1024 truncated at MAX_TOKENS with 40 tokens of
+// output. 8192 leaves headroom for thinking + 15 prompts of JSON.
 const GEMINI_MODEL = "gemini-3.5-flash";
-const GEMINI_MAX_TOKENS = 1024;
+const GEMINI_MAX_TOKENS = 8192;
 
 // The LLM must emit STRICT JSON in this shape; we validate + clamp it below.
 // name/domain are permissive here (real cleaning happens after parse) so a
@@ -166,11 +168,19 @@ function clamp(raw: z.infer<typeof llmSchema>): BrandSuggestions {
 export async function fetchBrandSuggestions(domain: string): Promise<BrandSuggestions> {
   try {
     const markdown = await scrapeHomepage(domain);
-    if (markdown === null) return EMPTY;
+    if (markdown === null) {
+      // Degradation is invisible to the user by design — make it visible to us.
+      console.error(`[suggest] degraded for ${domain}: homepage scrape failed`);
+      return EMPTY;
+    }
     const raw = await askGemini(buildPrompt(domain, markdown));
-    if (raw === null) return EMPTY;
+    if (raw === null) {
+      console.error(`[suggest] degraded for ${domain}: LLM call/parse failed`);
+      return EMPTY;
+    }
     return clamp(raw);
-  } catch {
+  } catch (err) {
+    console.error(`[suggest] degraded for ${domain}:`, err);
     return EMPTY;
   }
 }
