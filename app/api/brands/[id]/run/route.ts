@@ -46,8 +46,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ run: created.run, started: false, alreadyRunning: true });
   }
 
-  const { run, promptCount, platformCount } = created;
-  const credits = citationRunCredits(promptCount, platformCount);
+  const { run, promptCount } = created;
+  // Price per prompt PER MODEL from the run's resolved platform scope
+  // (createManualRunRow stored scope.platforms only when narrowing; NULL = the
+  // full 4-model worklist). Reuse that resolution — never re-derive it.
+  const credits = citationRunCredits(promptCount, run.scope?.platforms ?? undefined);
   const debit = await debitForRun(ctx.teamId, run.id, credits);
   if (!debit.applied) {
     await deleteRunRow(run.id);

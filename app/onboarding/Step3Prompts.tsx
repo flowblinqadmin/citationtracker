@@ -2,8 +2,8 @@
 
 // Step 3 — review & select prompts, pick frequency, and see the honest credit
 // meter (recomputed on every toggle). The meter is the ship-now innovation:
-// prompts × platforms × credits, live balance, and a "buy credits" nudge when
-// the first run would overdraw.
+// prompts × 10 credits (per-model breakdown below), live balance, and a "buy
+// credits" nudge when the first run would overdraw.
 import { useState } from "react";
 import { runCost, MAX_PROMPTS, BUY_CREDITS_FALLBACK } from "@/lib/onboarding";
 import type { WizardPrompt } from "@/lib/onboarding";
@@ -111,7 +111,10 @@ export default function Step3Prompts({
       {/* The credit meter — persistent, recomputed on every toggle. */}
       <div style={{ marginTop: 20, background: "#fff7ed", border: `1px solid ${ACCENT}`, borderRadius: 12, padding: 16 }}>
         <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: ACCENT }}>
-          {selectedCount} prompts × 4 AI platforms × 2 credits = {cost} credits per run
+          {selectedCount} prompts × 10 credits = {cost} credits per run
+        </p>
+        <p style={{ margin: "4px 0 0", fontSize: 12, color: MUTED }}>
+          Per prompt: ChatGPT 2 · Perplexity 2 · Gemini 2 · Claude 4 credits
         </p>
         {balance !== null && (
           <p style={{ margin: "8px 0 0", fontSize: 13, color: MUTED }}>

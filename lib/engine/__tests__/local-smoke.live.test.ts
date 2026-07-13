@@ -55,15 +55,16 @@ describe.skipIf(!live)("LOCAL live smoke (real providers, local DB)", () => {
     log(`  run=${runId}  team=${TEAM}  (local DB ${url.replace(/:[^:@]*@/, ":***@")})`);
     log("════════════════════════════════════════════════════════════════");
 
-    // ── PRICING: 2 credits per prompt per model ─────────────────────────────
-    log("\n── PRICING (2 credits per prompt per model, 1 credit = $0.10) ────");
-    for (const [np, pc] of [[1, 1], [1, 4], [2, 4], [10, 4], [30, 4]] as const) {
-      const cr = citationRunCredits(np, pc);
-      log(`  ${String(np).padStart(2)} prompt${np > 1 ? "s" : " "} × ${pc} model${pc > 1 ? "s" : " "} = ${String(cr).padStart(3)} credits  ($${(cr * CREDIT_USD).toFixed(2)})`);
+    // ── PRICING: 2 credits per prompt per model, Claude (anthropic) 4 ───────
+    log("\n── PRICING (2/prompt/model, Claude 4, 1 credit = $0.10) ────");
+    const ALL = ["openai", "perplexity", "google", "anthropic"] as const;
+    for (const [np, plats] of [[1, ["openai"] as const], [1, ALL], [2, ALL], [10, ALL], [30, ALL]] as const) {
+      const cr = citationRunCredits(np, plats);
+      log(`  ${String(np).padStart(2)} prompt${np > 1 ? "s" : " "} × ${plats.length} model${plats.length > 1 ? "s" : " "} = ${String(cr).padStart(3)} credits  ($${(cr * CREDIT_USD).toFixed(2)})`);
     }
 
-    // Real debit for THIS run through the actual billing path.
-    const cost = citationRunCredits(PROMPTS.length, 4);
+    // Real debit for THIS run through the actual billing path (full 4-model run).
+    const cost = citationRunCredits(PROMPTS.length);
     const bal = () => db.select({ b: schema.teams.creditBalance }).from(schema.teams).where(eq(schema.teams.id, TEAM)).then((r) => r[0].b);
     const before = await bal();
     const debit = await debitForRun(TEAM, runId, cost);

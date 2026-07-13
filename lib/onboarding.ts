@@ -112,10 +112,11 @@ export function mergeSuggestedPrompts(
   return [...checkedSuggestions, ...checkedDefaults, ...extraDefaults];
 }
 
-/** Credits one run of `selectedCount` prompts costs (4 platforms × 2 credits). */
+/** Credits one full 4-model run of `selectedCount` prompts costs (10/prompt:
+ *  ChatGPT/Perplexity/Gemini 2 each + Claude 4). */
 export function runCost(selectedCount: number): { credits: number } {
   if (!Number.isInteger(selectedCount) || selectedCount <= 0) return { credits: 0 };
-  return { credits: citationRunCredits(selectedCount, 4) };
+  return { credits: citationRunCredits(selectedCount) };
 }
 
 // ── Wizard state machine ────────────────────────────────────────────────────

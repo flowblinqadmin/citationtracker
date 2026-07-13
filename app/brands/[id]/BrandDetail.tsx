@@ -10,7 +10,7 @@ import { apiUrl } from "@/lib/api-url";
 import { GEO_ORIGIN } from "@/lib/config";
 import { citationRunCredits } from "@/lib/pricing";
 import { PROMPT_LIBRARY, PROMPT_CATEGORIES, fillTemplate } from "@/lib/prompt-library";
-import type { TrackerRunMetrics, TrackerPromptCategory, TrackerRunFrequency, TrackerCompetitor } from "@/lib/types/tracker";
+import type { TrackerRunMetrics, TrackerPromptCategory, TrackerRunFrequency, TrackerCompetitor, TrackerPlatform } from "@/lib/types/tracker";
 import CompetitorEditor from "./CompetitorEditor";
 import GettingStarted from "./GettingStarted";
 import TrackedUrlsEditor from "./TrackedUrlsEditor";
@@ -346,7 +346,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
   const [showLibrary, setShowLibrary] = useState(false);
   const [customText, setCustomText] = useState("");
   const [running, setRunning] = useState(false);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(PLATFORM_ORDER);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<TrackerPlatform[]>([...PLATFORM_ORDER]);
   const [notFound, setNotFound] = useState(false);
   const [openRunId, setOpenRunId] = useState<string | null>(null);
   const [replies, setReplies] = useState<Record<string, ReplyRow[]>>({});
@@ -399,13 +399,13 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
     return () => clearInterval(t);
   }, [hasActiveRun, clientId, load]);
 
-  const runCost = prompts.length > 0 ? citationRunCredits(prompts.length, selectedPlatforms.length) : 0;
-  const singleCost = citationRunCredits(1, selectedPlatforms.length);
-  // Geo's cron always runs scheduled runs on all 3 models — unaffected by the picker.
+  const runCost = prompts.length > 0 ? citationRunCredits(prompts.length, selectedPlatforms) : 0;
+  const singleCost = citationRunCredits(1, selectedPlatforms);
+  // Scheduled runs always query all 4 models (Claude priced at 4) — unaffected by the picker.
   const scheduledCost = prompts.length > 0 ? citationRunCredits(prompts.length) : 0;
   const inLibrary = new Set(prompts.map((p) => p.name));
 
-  function togglePlatform(p: string) {
+  function togglePlatform(p: TrackerPlatform) {
     setSelectedPlatforms((cur) =>
       cur.includes(p) ? (cur.length > 1 ? cur.filter((x) => x !== p) : cur) : [...cur, p],
     );
@@ -976,7 +976,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                     .filter((row) => replyFilter?.runId !== r.id || row.sentiment === replyFilter.sentiment)
                     .sort((a, b) =>
                       a.promptText === b.promptText
-                        ? PLATFORM_ORDER.indexOf(a.platform) - PLATFORM_ORDER.indexOf(b.platform)
+                        ? PLATFORM_ORDER.indexOf(a.platform as TrackerPlatform) - PLATFORM_ORDER.indexOf(b.platform as TrackerPlatform)
                         : 0,
                     )
                     .map((resp, i, sorted) => (

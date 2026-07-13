@@ -45,10 +45,10 @@ export async function GET(req: NextRequest) {
 
     if (!hasDebit && run.status !== "failed") {
       if (!run.promptsTotal) { skipped++; continue; } // can't price without a prompt count
-      // Per prompt × per model: scoped runs bill for their platform subset;
-      // malformed scope prices as a full 4-platform run.
-      const scoped = run.scope?.platforms?.length;
-      const credits = citationRunCredits(run.promptsTotal, scoped && scoped <= 4 ? scoped : 4);
+      // Per prompt × per model: scoped runs bill for their platform subset
+      // (Claude 4, the rest 2); an absent/empty scope prices as a full 4-model run.
+      const platforms = run.scope?.platforms?.length ? run.scope.platforms : undefined;
+      const credits = citationRunCredits(run.promptsTotal, platforms);
       const r = await debitForRun(teamId, run.id, credits, { allowNegative: true });
       if (r.applied) debited++;
       continue;

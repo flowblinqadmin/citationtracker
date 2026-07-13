@@ -1,7 +1,7 @@
 // The calculator + credit ledger for citation runs.
 //
-// Pricing: flat 1 credit per prompt per model queried (see lib/pricing.ts) —
-// simple, predictable, and above provider cost with margin.
+// Pricing: 2 credits per prompt per model, Claude (anthropic) 4 (see
+// lib/pricing.ts) — predictable, and above provider cost with per-model margin.
 //
 // Ledger: every op writes geo's credit_transactions with siteId = runId and a
 // citation-specific type. A partial unique index on (site_id, type) for those
@@ -18,6 +18,7 @@ export {
   CITATION_EXEC_MARGIN,
   CREDIT_USD,
   CREDITS_PER_PROMPT_MODEL,
+  PLATFORM_CREDITS,
   citationRunCredits,
 } from "@/lib/pricing";
 

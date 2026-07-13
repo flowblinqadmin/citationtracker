@@ -47,14 +47,14 @@ describe.skipIf(!dbUrl)("GET /api/cron/reconcile (Postgres)", () => {
     expect(res.status).toBe(401);
   });
 
-  it("debits an uncharged scheduled run post-hoc (10 prompts × 4 models → 80 credits)", async () => {
+  it("debits an uncharged scheduled run post-hoc (10 prompts × 4 models → 100 credits)", async () => {
     await seedRun("complete");
     const res = await call();
     expect((await res.json()).debited).toBe(1);
-    expect(await balance()).toBe(20);
+    expect(await balance()).toBe(0);
   });
 
-  it("prices an uncharged SCOPED run per prompt like any other (10 prompts × 1 model → 20 credits)", async () => {
+  it("prices an uncharged SCOPED run per prompt like any other (10 prompts × 1 base model → 20 credits)", async () => {
     const id = `tr_rec_scoped_${runSeq++}`;
     await db.execute(sql`
       INSERT INTO tracker.runs (id, client_id, org_id, period, kind, status, prompts_total, scope)
@@ -62,8 +62,19 @@ describe.skipIf(!dbUrl)("GET /api/cron/reconcile (Postgres)", () => {
     `);
     const res = await call();
     expect((await res.json()).debited).toBe(1);
-    // 2 credits per prompt × per model: 10 prompts × 1 platform → 20 credits
+    // Per prompt × per model: 10 prompts × 1 base platform (2 credits) → 20 credits
     expect(await balance()).toBe(80);
+  });
+
+  it("prices a scoped Claude (anthropic) run at the premium 4 credits/prompt (10 prompts → 40 credits)", async () => {
+    const id = `tr_rec_scoped_claude_${runSeq++}`;
+    await db.execute(sql`
+      INSERT INTO tracker.runs (id, client_id, org_id, period, kind, status, prompts_total, scope)
+      VALUES (${id}, 'tc_rec', ${ORG}, '2026-07', 'manual', 'complete', 10, '{"platforms":["anthropic"]}'::jsonb)
+    `);
+    const res = await call();
+    expect((await res.json()).debited).toBe(1);
+    expect(await balance()).toBe(60);
   });
 
   it("is idempotent — a second pass changes nothing", async () => {
@@ -71,20 +82,20 @@ describe.skipIf(!dbUrl)("GET /api/cron/reconcile (Postgres)", () => {
     await call();
     const second = await (await call()).json();
     expect(second).toMatchObject({ debited: 0, refunded: 0, redebited: 0 });
-    expect(await balance()).toBe(20);
+    expect(await balance()).toBe(0);
   });
 
   it("drives the balance negative rather than skipping billing", async () => {
     await db.update(schema.teams).set({ creditBalance: 1 }).where(eq(schema.teams.id, TEAM));
     await seedRun("complete");
     await call();
-    expect(await balance()).toBe(-79);
+    expect(await balance()).toBe(-99);
   });
 
   it("refunds a charged run that failed", async () => {
     const runId = await seedRun("running");
     await call(); // debit while running
-    expect(await balance()).toBe(20);
+    expect(await balance()).toBe(0);
     await db.execute(sql`UPDATE tracker.runs SET status = 'failed' WHERE id = ${runId}`);
     const res = await (await call()).json();
     expect(res.refunded).toBe(1);
@@ -107,7 +118,7 @@ describe.skipIf(!dbUrl)("GET /api/cron/reconcile (Postgres)", () => {
     await db.execute(sql`UPDATE tracker.runs SET status = 'complete' WHERE id = ${runId}`);
     const res = await (await call()).json();
     expect(res.redebited).toBe(1);
-    expect(await balance()).toBe(20);
+    expect(await balance()).toBe(0);
     // And it stays settled on the next pass.
     const final = await (await call()).json();
     expect(final).toMatchObject({ debited: 0, refunded: 0, redebited: 0 });

@@ -9,39 +9,61 @@ import {
   MODEL_COST_ESTIMATES,
   CITATION_EXEC_MARGIN,
   CREDITS_PER_PROMPT_MODEL,
+  PLATFORM_CREDITS,
   CREDIT_USD,
   citationRunCredits,
   debitForRun,
   refundForRun,
   redebitForRun,
 } from "@/lib/credits";
+import type { TrackerPlatform } from "@/lib/types/tracker";
 import { db } from "@/lib/db";
 import { teams, creditTransactions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 describe("citationRunCredits", () => {
-  it("charges 2 credits per prompt per model", () => {
-    expect(citationRunCredits(1, 1)).toBe(2);
-    expect(citationRunCredits(1)).toBe(8); // all 4 models (incl. Claude)
-    expect(citationRunCredits(2)).toBe(16);
-    expect(citationRunCredits(10, 1)).toBe(20);
-    expect(citationRunCredits(30)).toBe(240);
+  it("prices each base model at 2 credits per prompt and Claude at 4", () => {
+    expect(citationRunCredits(1, ["openai"])).toBe(2);
+    expect(citationRunCredits(1, ["perplexity"])).toBe(2);
+    expect(citationRunCredits(1, ["google"])).toBe(2);
+    expect(citationRunCredits(1, ["anthropic"])).toBe(4);
   });
 
-  it("keeps the per-prompt-model price ≥ the priciest model's cost × margin", () => {
-    const priciestUsd = Math.max(...Object.values(MODEL_COST_ESTIMATES)) * CITATION_EXEC_MARGIN;
-    expect(CREDITS_PER_PROMPT_MODEL * CREDIT_USD).toBeGreaterThanOrEqual(priciestUsd);
+  it("prices a full 4-model run at 10 credits per prompt (2+2+2+4)", () => {
+    expect(citationRunCredits(1)).toBe(10); // default = all four models
+    expect(citationRunCredits(15)).toBe(150);
+    expect(citationRunCredits(30)).toBe(300);
   });
 
-  it("rejects non-positive prompt counts", () => {
+  it("sums the selected platforms' per-model prices", () => {
+    expect(citationRunCredits(2, ["openai", "anthropic"])).toBe(12); // 2 × (2 + 4)
+    expect(citationRunCredits(10, ["anthropic"])).toBe(40);
+  });
+
+  it("keeps EACH model's per-prompt price ≥ that model's cost × margin", () => {
+    for (const platform of Object.keys(PLATFORM_CREDITS) as TrackerPlatform[]) {
+      const costUsd = MODEL_COST_ESTIMATES[platform] * CITATION_EXEC_MARGIN;
+      expect(PLATFORM_CREDITS[platform] * CREDIT_USD).toBeGreaterThanOrEqual(costUsd);
+    }
+  });
+
+  it("keeps the flat base scalar at 2 (still multiplied by other callers)", () => {
+    expect(CREDITS_PER_PROMPT_MODEL).toBe(2);
+  });
+
+  it("rejects non-positive or non-integer prompt counts", () => {
     expect(() => citationRunCredits(0)).toThrow();
     expect(() => citationRunCredits(-1)).toThrow();
+    expect(() => citationRunCredits(1.5)).toThrow();
   });
 
-  it("rejects platform counts outside 1–4", () => {
-    expect(() => citationRunCredits(1, 0)).toThrow();
-    expect(() => citationRunCredits(1, 5)).toThrow();
-    expect(() => citationRunCredits(1, 1.5)).toThrow();
+  it("rejects an empty, oversized, duplicate, or unknown platform list", () => {
+    expect(() => citationRunCredits(1, [])).toThrow();
+    expect(() => citationRunCredits(1, ["openai", "openai"])).toThrow();
+    expect(() =>
+      citationRunCredits(1, ["openai", "perplexity", "google", "anthropic", "openai"]),
+    ).toThrow();
+    expect(() => citationRunCredits(1, ["bing" as TrackerPlatform])).toThrow();
   });
 });
 

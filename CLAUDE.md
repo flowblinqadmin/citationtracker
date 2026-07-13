@@ -99,13 +99,17 @@ Node path on this machine: `/opt/homebrew/bin/node`.
 
 ## Credits & pricing
 
-- Flat 2 credits per prompt PER MODEL (1 credit = $0.10). Full 4-model run of
-  1 prompt = 8 credits; 1 prompt × 1 model = 2 credits. Constants in
-  `lib/pricing.ts` (`CREDITS_PER_PROMPT_MODEL = 2`); a margin test asserts the
-  per-prompt-model price covers the priciest model's cost × 1.3
-  (`MODEL_COST_ESTIMATES` — review quarterly). The wider 2-credit margin also
-  absorbs the un-billed per-run overhead (re-run-once, sentiment classification,
-  Firecrawl citation-verification + AI-search scrapes).
+- Base 2 credits per prompt PER MODEL, except Claude (anthropic) at 4 — premium
+  for its web-search tool + higher provider cost (1 credit = $0.10). Full 4-model
+  run of 1 prompt = 2+2+2+4 = 10 credits; 1 prompt × 1 base model = 2, × Claude
+  = 4. Constants in `lib/pricing.ts`: `CREDITS_PER_PROMPT_MODEL = 2` is the flat
+  base scalar; `PLATFORM_CREDITS` is the single source of truth for per-model
+  pricing, and `citationRunCredits(numPrompts, platforms?)` takes the actual
+  platform list (default all four). A PER-MODEL margin test asserts each model's
+  credit price covers its own cost × 1.3 (`MODEL_COST_ESTIMATES` — review
+  quarterly). The margins also absorb the un-billed per-run overhead
+  (re-run-once, sentiment classification, Firecrawl citation-verification +
+  AI-search scrapes).
 - Brand domains are REQUIRED at creation: `isBrandMentioned` returns false
   without a domain (mentions + sentiment dead), and citation stats key on it.
   Citation figures shown in the UI come from `listRunsWithStats` /

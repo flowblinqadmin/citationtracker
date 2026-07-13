@@ -10,6 +10,6 @@ export async function GET() {
     teamName: ctx.teamName,
     email: ctx.email, // for the global header (identity from x-user-email); may be null
     creditBalance: ctx.creditBalance,
-    creditsPerPrompt: citationRunCredits(1), // full run: 1 prompt × 3 models
+    creditsPerPrompt: citationRunCredits(1), // full run: 1 prompt × 4 models = 10 (Claude 4, rest 2)
   });
 }

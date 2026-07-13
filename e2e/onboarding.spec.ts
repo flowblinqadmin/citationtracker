@@ -22,7 +22,7 @@ const getBalance = () => getBalanceFor(E2E_ONBOARDING.teamId);
 test.use({ storageState: E2E_ONBOARDING.storageState });
 test.describe.configure({ mode: "serial" });
 
-// Ample balance so the 120-credit first run clears and the meter math is known.
+// Ample balance so the 150-credit first run clears and the meter math is known.
 const START_BALANCE = 200;
 const domain = "acme-onboard-e2e.com";
 const brandNameExpected = "Acme-onboard-e2e"; // brandFromDomain: first label, capitalized
@@ -67,14 +67,14 @@ test.describe("onboarding wizard — full first-run flow", () => {
     expect(await checkboxes.evaluateAll((els) => els.every((e) => (e as HTMLInputElement).checked))).toBe(true);
     await expect(page.getByText("15/15 prompts selected")).toBeVisible();
 
-    // Credit meter: 15 × 4 × 2 = 120, and the after-first-run balance.
-    await expect(page.getByText("15 prompts × 4 AI platforms × 2 credits = 120 credits per run")).toBeVisible();
-    await expect(page.getByText(`Balance: ${START_BALANCE} → after first run: ${START_BALANCE - 120}`)).toBeVisible();
+    // Credit meter: 15 × 10 = 150, and the after-first-run balance.
+    await expect(page.getByText("15 prompts × 10 credits = 150 credits per run")).toBeVisible();
+    await expect(page.getByText(`Balance: ${START_BALANCE} → after first run: ${START_BALANCE - 150}`)).toBeVisible();
 
-    // Deselect one prompt → meter recomputes to 14 × 8 = 112.
+    // Deselect one prompt → meter recomputes to 14 × 10 = 140.
     await checkboxes.first().uncheck();
     await expect(page.getByText("14/15 prompts selected")).toBeVisible();
-    await expect(page.getByText("14 prompts × 4 AI platforms × 2 credits = 112 credits per run")).toBeVisible();
+    await expect(page.getByText("14 prompts × 10 credits = 140 credits per run")).toBeVisible();
 
     // Keep frequency "manual" so the post-onboarding getting-started checklist
     // has an outstanding item ("Schedule set") and stays rendered on the brand
@@ -88,9 +88,9 @@ test.describe("onboarding wizard — full first-run flow", () => {
     await expect(page.getByText("1/50 URLs")).toBeVisible();
     await page.getByRole("button", { name: "Launch" }).click();
 
-    // (6) Step 5 — the pre-commit summary + CTA showing the cost. 14 selected → 112.
+    // (6) Step 5 — the pre-commit summary + CTA showing the cost. 14 selected → 140.
     await expect(page.getByRole("heading", { name: "Ready to launch" })).toBeVisible();
-    const cta = page.getByRole("button", { name: /Run my first report \(112 credits\)/ });
+    const cta = page.getByRole("button", { name: /Run my first report \(140 credits\)/ });
     await expect(cta).toBeVisible();
 
     const before = await getBalance();
@@ -106,8 +106,8 @@ test.describe("onboarding wizard — full first-run flow", () => {
     // The fake-provider run completes → the ready modal.
     await expect(page.getByRole("heading", { name: "Your brand report is ready!" })).toBeVisible({ timeout: 90_000 });
 
-    // The debit actually happened: balance dropped by exactly the run cost (112).
-    expect(await getBalance()).toBe(START_BALANCE - 112);
+    // The debit actually happened: balance dropped by exactly the run cost (140).
+    expect(await getBalance()).toBe(START_BALANCE - 140);
 
     // The punch list renders (fixture output → at least the coverage grid).
     await expect(page.getByText("What to fix next")).toBeVisible();
@@ -147,10 +147,10 @@ test.describe("onboarding wizard — broke team", () => {
     await expect(page.getByRole("heading", { name: "Your brand competitors" })).toBeVisible();
     await page.getByRole("button", { name: "Continue" }).click();
 
-    // Step 3 — 120-credit run against a 0 balance surfaces the inline
+    // Step 3 — 150-credit run against a 0 balance surfaces the inline
     // "credits short" state with a Buy credits link, and Continue is disabled.
-    await expect(page.getByText("15 prompts × 4 AI platforms × 2 credits = 120 credits per run")).toBeVisible();
-    await expect(page.getByText(/You.?re 120 credits short/)).toBeVisible();
+    await expect(page.getByText("15 prompts × 10 credits = 150 credits per run")).toBeVisible();
+    await expect(page.getByText(/You.?re 150 credits short/)).toBeVisible();
     await expect(page.getByRole("link", { name: "Buy credits" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
 

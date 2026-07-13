@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { apiUrl } from "@/lib/api-url";
 import { PLATFORM_LABEL, PLATFORM_ORDER } from "./platforms";
+import type { TrackerPlatform } from "@/lib/types/tracker";
 
 const CARD = "#ffffff";
 const BORDER = "1px solid rgba(0,0,0,0.08)";
@@ -45,7 +46,7 @@ function fmtDate(iso: string | null): string {
 /** The headline: unmistakable per-URL citation status. */
 function StatusBadge({ stats }: { stats: TrackedUrlStats }) {
   if (stats.exactCount > 0) {
-    const chips = [...stats.platforms].sort((a, b) => PLATFORM_ORDER.indexOf(a) - PLATFORM_ORDER.indexOf(b));
+    const chips = [...stats.platforms].sort((a, b) => PLATFORM_ORDER.indexOf(a as TrackerPlatform) - PLATFORM_ORDER.indexOf(b as TrackerPlatform));
     return (
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, fontSize: 12 }}>
         <span style={{ background: "#f0fdf4", color: GREEN, border: `1px solid ${GREEN}`, borderRadius: 999, padding: "2px 10px", fontWeight: 700 }}>

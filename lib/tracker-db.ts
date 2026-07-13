@@ -922,7 +922,7 @@ export async function trackedUrlStatsFor(
 }
 
 export type ManualRunResult =
-  | { kind: "run"; run: TrackerRun; promptCount: number; platformCount: number }
+  | { kind: "run"; run: TrackerRun; promptCount: number }
   | { kind: "in_flight"; run: TrackerRun }
   | { kind: "no_prompts" }
   | { kind: "invalid_scope"; message: string }
@@ -1025,7 +1025,8 @@ export async function createManualRunRow(
       scope,
     })
     .returning();
-  return { kind: "run", run, promptCount, platformCount: platforms?.length ?? ALL_PLATFORMS.length };
+  // Pricing reads the resolved platforms off run.scope (NULL = full worklist).
+  return { kind: "run", run, promptCount };
 }
 
 export async function markRunFailed(runId: string, error: string): Promise<void> {

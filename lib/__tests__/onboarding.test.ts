@@ -147,9 +147,9 @@ describe("mergeSuggestedPrompts", () => {
 });
 
 describe("runCost", () => {
-  it("is selectedCount × 4 platforms × 2 credits", () => {
-    expect(runCost(1)).toEqual({ credits: 8 });
-    expect(runCost(15)).toEqual({ credits: 120 });
+  it("is selectedCount × the full-run per-prompt price (10 credits: 2+2+2+4)", () => {
+    expect(runCost(1)).toEqual({ credits: 10 });
+    expect(runCost(15)).toEqual({ credits: 150 });
   });
 
   it("returns {credits:0} for 0 selected and never throws", () => {
