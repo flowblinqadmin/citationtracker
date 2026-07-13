@@ -49,7 +49,7 @@ export type AgentModel = (typeof AGENT_MODELS)[number];
 /** Internal engine platform key for each public agent model. */
 type EnginePlatform = "openai" | "anthropic" | "perplexity" | "google";
 
-const MODEL_TO_PLATFORM: Record<AgentModel, EnginePlatform> = {
+export const MODEL_TO_PLATFORM: Record<AgentModel, EnginePlatform> = {
   openai: "openai",
   anthropic: "anthropic",
   perplexity: "perplexity",

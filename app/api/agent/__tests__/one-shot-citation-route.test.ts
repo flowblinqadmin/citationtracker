@@ -5,15 +5,17 @@
 // nothing to mock away — no tracker.* / public.* access exists to stub.
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
+import { SignJWT } from "jose";
 import { POST } from "@/app/api/agent/one-shot-citation/route";
 import { __resetAgentRateLimits, AGENT_RATE_LIMIT } from "@/lib/agent-rate-limit";
 
 const TOKEN = "a".repeat(40); // ≥ MIN_LEN (32)
+const JWT_SECRET = "j".repeat(64); // ≥ 32; geo's API_JWT_SECRET floor
 const PROVIDER_KEYS = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "PERPLEXITY_API_KEY", "GEMINI_API_KEY"];
 
 const saved: Record<string, string | undefined> = {};
 function snapshotEnv() {
-  for (const k of [...PROVIDER_KEYS, "AGENT_SERVICE_TOKEN", "E2E_FAKE_PROVIDERS", "VERCEL"]) {
+  for (const k of [...PROVIDER_KEYS, "AGENT_SERVICE_TOKEN", "API_JWT_SECRET", "E2E_FAKE_PROVIDERS", "VERCEL"]) {
     saved[k] = process.env[k];
   }
 }
@@ -193,5 +195,268 @@ describe("POST /api/agent/one-shot-citation", () => {
     const limited = await call(good);
     expect(limited.status).toBe(429);
     expect(limited.headers.get("Retry-After")).toBeTruthy();
+  });
+
+  // ── Regression: service-token path unchanged in a billed-capable deployment ──
+  // With BOTH secrets set, a service-token caller must still get the exact
+  // unbilled body — no credits_charged / credits_remaining fields.
+  it("service-token success body carries NO billing fields even when JWT billing is provisioned", async () => {
+    process.env.API_JWT_SECRET = JWT_SECRET;
+    const res = await call({ brandDomain: "acme-e2e.com", prompts: ["p"], models: ["openai"] });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).not.toHaveProperty("credits_charged");
+    expect(body).not.toHaveProperty("credits_remaining");
+    expect(body.results).toHaveLength(1);
+  });
+});
+
+// ── Billed mode (geo v1 customer JWT) ─────────────────────────────────────────
+// JWT-auth mapping tests need no DB. The debit/refund/402/ledger assertions are
+// DB-backed and gated on TEST_DATABASE_URL (skip otherwise), mirroring
+// lib/__tests__/credits.test.ts.
+
+/** Mint a geo-style v1 API JWT (HS256, sub/team_id/scopes, exp). */
+async function mintJwt(opts: {
+  secret?: string;
+  teamId?: string;
+  scopes?: string[];
+  expiresIn?: string;
+} = {}): Promise<string> {
+  const key = new TextEncoder().encode(opts.secret ?? JWT_SECRET);
+  return new SignJWT({ team_id: opts.teamId ?? "team_billed_test", scopes: opts.scopes ?? ["audit:write"] })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject("client_test")
+    .setIssuedAt()
+    .setExpirationTime(opts.expiresIn ?? "1h")
+    .sign(key);
+}
+
+describe("POST /api/agent/one-shot-citation — billed mode auth mapping", () => {
+  beforeEach(() => {
+    snapshotEnv();
+    __resetAgentRateLimits();
+    process.env.AGENT_SERVICE_TOKEN = TOKEN;
+    process.env.API_JWT_SECRET = JWT_SECRET;
+    process.env.E2E_FAKE_PROVIDERS = "1";
+    delete process.env.VERCEL;
+    for (const k of PROVIDER_KEYS) process.env[k] = "test-key";
+  });
+  afterEach(() => restoreEnv());
+
+  it("401 on an expired JWT", async () => {
+    const jwt = await mintJwt({ expiresIn: "-1h" });
+    const res = await call({ brandDomain: "acme.com", prompts: ["p"] }, `Bearer ${jwt}`);
+    expect(res.status).toBe(401);
+  });
+
+  it("401 on a bad-signature JWT", async () => {
+    const jwt = await mintJwt({ secret: "z".repeat(64) });
+    const res = await call({ brandDomain: "acme.com", prompts: ["p"] }, `Bearer ${jwt}`);
+    expect(res.status).toBe(401);
+  });
+
+  it("403 when the JWT lacks audit:write", async () => {
+    const jwt = await mintJwt({ scopes: ["audit:read"] });
+    const res = await call({ brandDomain: "acme.com", prompts: ["p"] }, `Bearer ${jwt}`);
+    expect(res.status).toBe(403);
+  });
+
+  it("401 (not 503) when a non-service bearer is sent but billing is unprovisioned", async () => {
+    delete process.env.API_JWT_SECRET;
+    // Billing not configured: a wrong/unverifiable bearer must still be a plain
+    // 401 — identical to the service-token-only contract, never leaking that
+    // billing is off.
+    const res = await call({ brandDomain: "acme.com", prompts: ["p"] }, `Bearer ${"x".repeat(120)}`);
+    expect(res.status).toBe(401);
+  });
+});
+
+// ── Billed mode: DB-backed billing (debit / 402 / refunds / ledger) ───────────
+const dbUrl = process.env.TEST_DATABASE_URL;
+
+describe.skipIf(!dbUrl)("POST /api/agent/one-shot-citation — billed mode ledger", () => {
+  const TEAM = "team_osc_billed_test";
+
+  beforeEach(async () => {
+    snapshotEnv();
+    __resetAgentRateLimits();
+    process.env.AGENT_SERVICE_TOKEN = TOKEN;
+    process.env.API_JWT_SECRET = JWT_SECRET;
+    process.env.E2E_FAKE_PROVIDERS = "1";
+    delete process.env.VERCEL;
+    for (const k of PROVIDER_KEYS) process.env[k] = "test-key";
+
+    const { db } = await import("@/lib/db");
+    const { teams, creditTransactions } = await import("@/lib/db/schema");
+    const { eq } = await import("drizzle-orm");
+    await db.delete(creditTransactions).where(eq(creditTransactions.teamId, TEAM));
+    await db.delete(teams).where(eq(teams.id, TEAM));
+    await db.insert(teams).values({
+      id: TEAM, name: "OSC Billed Test", ownerUserId: "u_test", creditBalance: 100,
+    });
+  });
+  afterEach(() => restoreEnv());
+
+  async function balance(): Promise<number> {
+    const { db } = await import("@/lib/db");
+    const { teams } = await import("@/lib/db/schema");
+    const { eq } = await import("drizzle-orm");
+    const [t] = await db.select({ b: teams.creditBalance }).from(teams).where(eq(teams.id, TEAM));
+    return t.b;
+  }
+
+  async function ledgerRows() {
+    const { db } = await import("@/lib/db");
+    const { creditTransactions } = await import("@/lib/db/schema");
+    const { eq } = await import("drizzle-orm");
+    return db.select().from(creditTransactions).where(eq(creditTransactions.teamId, TEAM));
+  }
+
+  it("debits before execution and returns credits_charged + credits_remaining", async () => {
+    // 1 prompt × 1 model × 2 = 2 credits.
+    const jwt = await mintJwt({ teamId: TEAM });
+    const res = await call(
+      { brandDomain: "acme-e2e.com", prompts: ["best?"], models: ["openai"] },
+      `Bearer ${jwt}`,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.credits_charged).toBe(2);
+    expect(body.credits_remaining).toBe(98);
+    expect(await balance()).toBe(98);
+
+    const rows = await ledgerRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].type).toBe("citation_run");
+    expect(rows[0].creditsChanged).toBe(-2);
+    expect(rows[0].siteId?.startsWith("osc_")).toBe(true);
+  });
+
+  it("charges prompts × models × 2 for a multi-cell request", async () => {
+    // 2 prompts × 2 models × 2 = 8 credits.
+    const jwt = await mintJwt({ teamId: TEAM });
+    const res = await call(
+      { brandDomain: "acme-e2e.com", prompts: ["a", "b"], models: ["openai", "gemini"] },
+      `Bearer ${jwt}`,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.credits_charged).toBe(8);
+    expect(await balance()).toBe(92);
+  });
+
+  it("prices per-model: a Claude-included 4-model run costs 10, not 8", async () => {
+    // 1 prompt × (openai 2 + anthropic 4 + perplexity 2 + gemini 2) = 10 credits.
+    // The flat ×2 bug would have charged 1×4×2 = 8 — this is the regression guard.
+    const jwt = await mintJwt({ teamId: TEAM });
+    const res = await call(
+      {
+        brandDomain: "acme-e2e.com",
+        prompts: ["best?"],
+        models: ["openai", "anthropic", "perplexity", "gemini"],
+      },
+      `Bearer ${jwt}`,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.credits_charged).toBe(10);
+    expect(await balance()).toBe(90);
+  });
+
+  it("prices Claude alone at 4 (the premium per-model rate), not the base 2", async () => {
+    // 1 prompt × anthropic (4) = 4. Flat ×2 would have charged 2.
+    const jwt = await mintJwt({ teamId: TEAM });
+    const res = await call(
+      { brandDomain: "acme-e2e.com", prompts: ["best?"], models: ["anthropic"] },
+      `Bearer ${jwt}`,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.credits_charged).toBe(4);
+    expect(await balance()).toBe(96);
+  });
+
+  it("partial refund of a MISSING Claude refunds 4, not 2 (per-model refund)", async () => {
+    // Request openai + anthropic, only openai configured → billed 1×(2+4)=6,
+    // refund the missing Claude at its own price 1×4=4 (NOT a flat 1×2). Net 2.
+    delete process.env.ANTHROPIC_API_KEY;
+    const jwt = await mintJwt({ teamId: TEAM });
+    const res = await call(
+      { brandDomain: "acme-e2e.com", prompts: ["p"], models: ["openai", "anthropic"] },
+      `Bearer ${jwt}`,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.credits_charged).toBe(2); // 6 debited − 4 refunded
+    expect(body.unconfigured_models).toEqual(["anthropic"]);
+    expect(await balance()).toBe(98);
+
+    const rows = await ledgerRows();
+    const types = rows.map((r) => r.type).sort();
+    expect(types).toEqual(["citation_run", "citation_run_refund"]);
+    // The refund row is 4 credits, not 2.
+    const refundRow = rows.find((r) => r.type === "citation_run_refund");
+    expect(refundRow?.creditsChanged).toBe(4);
+    expect(new Set(rows.map((r) => r.siteId)).size).toBe(1);
+  });
+
+  it("402 insufficient_credits with required + balance, and no debit side-effect", async () => {
+    // Drain the team to 1 credit; a 1×1 run needs 2.
+    const { db } = await import("@/lib/db");
+    const { teams } = await import("@/lib/db/schema");
+    const { eq } = await import("drizzle-orm");
+    await db.update(teams).set({ creditBalance: 1 }).where(eq(teams.id, TEAM));
+
+    const jwt = await mintJwt({ teamId: TEAM });
+    const res = await call(
+      { brandDomain: "acme-e2e.com", prompts: ["p"], models: ["openai"] },
+      `Bearer ${jwt}`,
+    );
+    expect(res.status).toBe(402);
+    const body = await res.json();
+    expect(body.error).toBe("insufficient_credits");
+    expect(body.required).toBe(2);
+    expect(body.balance).toBe(1);
+    expect(await balance()).toBe(1);
+    expect(await ledgerRows()).toHaveLength(0);
+  });
+
+  it("partial refund: bills the full requested set, refunds unconfigured models", async () => {
+    // Request 2 models, only openai configured → billed 2×1×2=4, refund 1×1×2=2.
+    delete process.env.GEMINI_API_KEY;
+    const jwt = await mintJwt({ teamId: TEAM });
+    const res = await call(
+      { brandDomain: "acme-e2e.com", prompts: ["p"], models: ["openai", "gemini"] },
+      `Bearer ${jwt}`,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.credits_charged).toBe(2); // 4 debited − 2 refunded
+    expect(body.unconfigured_models).toEqual(["gemini"]);
+    expect(await balance()).toBe(98);
+
+    const rows = await ledgerRows();
+    const types = rows.map((r) => r.type).sort();
+    expect(types).toEqual(["citation_run", "citation_run_refund"]);
+    // Debit and refund share the SAME osc_ site_id (idempotency lineage).
+    expect(new Set(rows.map((r) => r.siteId)).size).toBe(1);
+  });
+
+  it("rate-limits billed callers per team (30/hr)", async () => {
+    const jwt = await mintJwt({ teamId: TEAM });
+    const good = { brandDomain: "acme-e2e.com", prompts: ["p"], models: ["openai"] };
+    // Give the team plenty of credits for the burst.
+    const { db } = await import("@/lib/db");
+    const { teams } = await import("@/lib/db/schema");
+    const { eq } = await import("drizzle-orm");
+    await db.update(teams).set({ creditBalance: 10_000 }).where(eq(teams.id, TEAM));
+
+    for (let i = 0; i < AGENT_RATE_LIMIT; i++) {
+      const ok = await call(good, `Bearer ${jwt}`);
+      expect(ok.status).toBe(200);
+    }
+    const limited = await call(good, `Bearer ${jwt}`);
+    expect(limited.status).toBe(429);
   });
 });

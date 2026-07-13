@@ -22,6 +22,7 @@
     "@types/react-dom": "^19.2.3",
     "@upstash/qstash": "^2.11.1",
     "drizzle-orm": "^0.45.1",
+    "jose": "^5.10.0",
     "nanoid": "^5.1.6",
     "next": "^16.1.6",
     "openai": "^6.45.0",

@@ -34,6 +34,17 @@ function bearerToken(req: NextRequest | Request): string {
 }
 
 /**
+ * True when AGENT_SERVICE_TOKEN is set to a real secret (≥ MIN_LEN). The core
+ * agent surface is "provisioned" only then; an unset secret means the service
+ * itself isn't stood up, which the route reports as 503 (distinct from a 401 bad
+ * token) so the storefront can tell the two apart. Exposed for the dual-auth
+ * route: the 503 must win before any billed-mode JWT attempt.
+ */
+export function agentServiceProvisioned(): boolean {
+  return isValidSecret(process.env.AGENT_SERVICE_TOKEN);
+}
+
+/**
  * True when the caller's Bearer token constant-time-matches AGENT_SERVICE_TOKEN.
  * False when the secret is unset/too-short (callers needing the misconfig-vs-bad-
  * auth distinction use assertAgentAuth instead).
