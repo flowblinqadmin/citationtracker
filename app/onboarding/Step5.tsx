@@ -11,11 +11,12 @@ import type { TrackerRunFrequency } from "@/lib/types/tracker";
 import { PLATFORM_LABEL, PLATFORM_ORDER } from "@/app/brands/[id]/platforms";
 import DemoReport from "./DemoReport";
 import PunchList from "./PunchList";
+import { UI } from "@/app/ui";
 
-const BORDER = "1px solid rgba(0,0,0,0.08)";
-const MUTED = "#78716c";
-const ACCENT = "#b45309";
-const RED = "#dc2626";
+const BORDER = UI.BORDER_CSS;
+const MUTED = UI.T2;
+const ACCENT = UI.COPPER;
+const RED = UI.RED;
 
 const STAGE_COPY: Record<string, string> = {
   brand: "Creating brand…",
@@ -114,7 +115,7 @@ export default function Step5(props: Step5Props) {
         <p style={{ color: MUTED, fontSize: 14, marginTop: 6, marginBottom: 16 }}>
           Review your setup, then run your first Brand Report.
         </p>
-        <div style={{ background: "#fff7ed", border: BORDER, borderRadius: 12, padding: "16px 18px", marginBottom: 20 }}>
+        <div style={{ background: UI.COPPER_BG, border: BORDER, borderRadius: 12, padding: "16px 18px", marginBottom: 20 }}>
           <SummaryRow label="Brand" value={brandName || "—"} />
           <SummaryRow label="Prompts" value={`${promptCount}`} />
           <SummaryRow label="Competitors" value={`${competitorCount}`} />
@@ -231,7 +232,7 @@ export default function Step5(props: Step5Props) {
               borderRadius: 999,
               fontSize: 12,
               border: `1px solid ${ACCENT}`,
-              background: "#fff7ed",
+              background: UI.COPPER_BG,
               color: ACCENT,
               animation: "citePulse 1.6s ease-in-out infinite",
             }}

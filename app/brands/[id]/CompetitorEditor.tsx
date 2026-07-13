@@ -8,12 +8,13 @@ import { toast } from "sonner";
 import { apiUrl } from "@/lib/api-url";
 import { normalizeDomain } from "@/lib/domain";
 import type { TrackerCompetitor } from "@/lib/types/tracker";
+import { UI } from "@/app/ui";
 
-const CARD = "#ffffff";
-const BORDER = "1px solid rgba(0,0,0,0.08)";
-const MUTED = "#78716c";
-const ACCENT = "#b45309";
-const RED = "#dc2626";
+const CARD = UI.CARD;
+const BORDER = UI.BORDER_CSS;
+const MUTED = UI.T2;
+const ACCENT = UI.COPPER;
+const RED = UI.RED;
 
 const MAX_COMPETITORS = 10;
 

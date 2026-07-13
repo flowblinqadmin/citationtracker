@@ -5,10 +5,11 @@
 import { useState } from "react";
 import { normalizeDomain } from "@/lib/domain";
 import { brandFromDomain } from "@/lib/onboarding";
+import { UI } from "@/app/ui";
 
-const BORDER = "1px solid rgba(0,0,0,0.08)";
-const MUTED = "#78716c";
-const ACCENT = "#b45309";
+const BORDER = UI.BORDER_CSS;
+const MUTED = UI.T2;
+const ACCENT = UI.COPPER;
 
 export default function Step1Brand({
   domain,
@@ -70,7 +71,7 @@ export default function Step1Brand({
           ) : (
             <span
               aria-hidden
-              style={{ width: 28, height: 28, flexShrink: 0, borderRadius: "50%", background: "#fff7ed", color: ACCENT, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600 }}
+              style={{ width: 28, height: 28, flexShrink: 0, borderRadius: "50%", background: UI.COPPER_BG, color: ACCENT, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600 }}
             >
               {(brandName || cleanDomain).charAt(0).toUpperCase()}
             </span>

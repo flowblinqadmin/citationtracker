@@ -8,11 +8,12 @@ import { apiUrl } from "@/lib/api-url";
 import { normalizeDomain } from "@/lib/domain";
 import type { WizardCompetitor } from "@/lib/onboarding";
 import { MAX_COMPETITORS } from "@/lib/onboarding";
+import { UI } from "@/app/ui";
 
-const CARD = "#ffffff";
-const BORDER = "1px solid rgba(0,0,0,0.08)";
-const MUTED = "#78716c";
-const ACCENT = "#b45309";
+const CARD = UI.CARD;
+const BORDER = UI.BORDER_CSS;
+const MUTED = UI.T2;
+const ACCENT = UI.COPPER;
 
 interface SuggestResponse {
   competitors?: { name: string; domain: string }[];
@@ -99,7 +100,7 @@ export default function Step2Competitors({
       <div style={{ display: "grid", gap: 8, marginTop: 20 }}>
         {loading && competitors.length === 0
           ? [0, 1, 2].map((i) => (
-              <div key={i} style={{ height: 42, background: "#f5f5f4", borderRadius: 8, opacity: 0.6 }} />
+              <div key={i} style={{ height: 42, background: UI.NEUTRAL_BG, borderRadius: 8, opacity: 0.6 }} />
             ))
           : competitors.map((c, i) => {
               const bad = c.domain.length > 0 && !normalizeDomain(c.domain);
@@ -117,7 +118,7 @@ export default function Step2Competitors({
                     onChange={(e) => update(i, { domain: e.target.value })}
                     placeholder="rival.com"
                     maxLength={253}
-                    style={{ flex: 1, padding: "9px 12px", border: bad ? "1px solid #dc2626" : BORDER, borderRadius: 8, fontSize: 14 }}
+                    style={{ flex: 1, padding: "9px 12px", border: bad ? `1px solid ${UI.RED}` : BORDER, borderRadius: 8, fontSize: 14 }}
                   />
                   <button
                     onClick={() => remove(i)}

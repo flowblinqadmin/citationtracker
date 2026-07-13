@@ -6,12 +6,13 @@
 import { useEffect, useState } from "react";
 import { apiUrl } from "@/lib/api-url";
 import { buildPunchList, type PunchResponse, type PunchList as PunchListData } from "@/lib/punch-list";
+import { UI } from "@/app/ui";
 
-const CARD = "#ffffff";
-const BORDER = "1px solid rgba(0,0,0,0.08)";
-const MUTED = "#78716c";
-const GREEN = "#16a34a";
-const RED = "#dc2626";
+const CARD = UI.CARD;
+const BORDER = UI.BORDER_CSS;
+const MUTED = UI.T2;
+const GREEN = UI.GREEN;
+const RED = UI.RED;
 
 function sentimentColor(sentiment: string | null): string {
   if (sentiment === "positive") return GREEN;
@@ -68,7 +69,7 @@ export default function PunchList({
                 <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>Which engines mention {brandName}</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
                   {item.platforms.map((p) => (
-                    <div key={p.platform} style={{ border: BORDER, borderRadius: 8, padding: "8px 10px", textAlign: "center", background: p.mentioned ? "#f0fdf4" : "#fafaf9" }}>
+                    <div key={p.platform} style={{ border: BORDER, borderRadius: 8, padding: "8px 10px", textAlign: "center", background: p.mentioned ? UI.GREEN_BG : UI.REPLY_BG }}>
                       <div style={{ fontSize: 12, color: MUTED }}>{p.platformLabel}</div>
                       <div style={{ fontSize: 16, fontWeight: 700, color: p.mentioned ? GREEN : MUTED }}>{p.mentioned ? "✓" : "—"}</div>
                     </div>
@@ -80,7 +81,7 @@ export default function PunchList({
           if (item.kind === "quote") {
             const color = sentimentColor(item.sentiment);
             return (
-              <div key={i} style={{ borderLeft: `3px solid ${color}`, background: "#fafaf9", borderRadius: 6, padding: "8px 12px" }}>
+              <div key={i} style={{ borderLeft: `3px solid ${color}`, background: UI.REPLY_BG, borderRadius: 6, padding: "8px 12px" }}>
                 <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>
                   {item.platformLabel}
                   {item.sentiment ? <span style={{ color, fontWeight: 600 }}> · {item.sentiment}</span> : null}

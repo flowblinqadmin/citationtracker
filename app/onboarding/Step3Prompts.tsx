@@ -8,11 +8,12 @@ import { useState } from "react";
 import { runCost, MAX_PROMPTS, BUY_CREDITS_FALLBACK } from "@/lib/onboarding";
 import type { WizardPrompt } from "@/lib/onboarding";
 import type { TrackerRunFrequency } from "@/lib/types/tracker";
+import { UI } from "@/app/ui";
 
-const CARD = "#ffffff";
-const BORDER = "1px solid rgba(0,0,0,0.08)";
-const MUTED = "#78716c";
-const ACCENT = "#b45309";
+const CARD = UI.CARD;
+const BORDER = UI.BORDER_CSS;
+const MUTED = UI.T2;
+const ACCENT = UI.COPPER;
 
 const MAX_CUSTOM_LEN = 500;
 
@@ -109,7 +110,7 @@ export default function Step3Prompts({
       </label>
 
       {/* The credit meter — persistent, recomputed on every toggle. */}
-      <div style={{ marginTop: 20, background: "#fff7ed", border: `1px solid ${ACCENT}`, borderRadius: 12, padding: 16 }}>
+      <div style={{ marginTop: 20, background: UI.COPPER_BG, border: `1px solid ${ACCENT}`, borderRadius: 12, padding: 16 }}>
         <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: ACCENT }}>
           {selectedCount} prompts × 10 credits = {cost} credits per run
         </p>

@@ -15,6 +15,7 @@ import CompetitorEditor from "./CompetitorEditor";
 import GettingStarted from "./GettingStarted";
 import TrackedUrlsEditor from "./TrackedUrlsEditor";
 import { PLATFORM_LABEL, PLATFORM_ORDER } from "./platforms";
+import { UI } from "@/app/ui";
 
 interface Brand {
   id: string;
@@ -80,7 +81,7 @@ function CheckBadge({ check }: { check: CheckStatus | null | undefined }) {
   if (check === "verified") return <span title="Page is live and mentions the brand" style={{ color: GREEN }}>✓</span>;
   if (check === "no_mention")
     return (
-      <span title="Page is live but never mentions the brand — likely a hallucinated citation" style={{ color: "#d97706", fontWeight: 600 }}>
+      <span title="Page is live but never mentions the brand — likely a hallucinated citation" style={{ color: ORANGE, fontWeight: 600 }}>
         ⚠ no brand mention
       </span>
     );
@@ -88,12 +89,13 @@ function CheckBadge({ check }: { check: CheckStatus | null | undefined }) {
   return null; // pending / unverifiable — no claim either way
 }
 
-const CARD = "#ffffff";
-const BORDER = "1px solid rgba(0,0,0,0.08)";
-const MUTED = "#78716c";
-const ACCENT = "#b45309";
-const GREEN = "#16a34a";
-const RED = "#dc2626";
+const CARD = UI.CARD;
+const BORDER = UI.BORDER_CSS;
+const MUTED = UI.T2;
+const ACCENT = UI.COPPER;
+const GREEN = UI.GREEN;
+const RED = UI.RED;
+const ORANGE = UI.ORANGE;
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
@@ -124,9 +126,9 @@ interface HistoryRow {
 }
 
 const SENTIMENT_STYLE: Record<string, { color: string; bg: string; label: string }> = {
-  positive: { color: GREEN, bg: "#f0fdf4", label: "positive" },
-  negative: { color: RED, bg: "#fef2f2", label: "negative" },
-  neutral: { color: MUTED, bg: "#f5f5f4", label: "neutral" },
+  positive: { color: GREEN, bg: UI.GREEN_BG, label: "positive" },
+  negative: { color: RED, bg: UI.RED_BG, label: "negative" },
+  neutral: { color: MUTED, bg: UI.NEUTRAL_BG, label: "neutral" },
 };
 
 function SentimentChip({ sentiment }: { sentiment: string | null }) {
@@ -224,7 +226,7 @@ function RunDigest({ rows, onSelectSentiment }: { rows: ReplyRow[]; onSelectSent
   const mentioned = finals.filter((r) => r.brandMentioned).length;
   const counts = tallySentiment(finals);
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 14, background: "#fff7ed", border: BORDER, borderRadius: 8, padding: "8px 12px", fontSize: 12, marginTop: 10 }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 14, background: UI.COPPER_BG, border: BORDER, borderRadius: 8, padding: "8px 12px", fontSize: 12, marginTop: 10 }}>
       <span>
         <strong>{mentioned}</strong> of {finals.length} replies mention the brand
       </span>
@@ -253,7 +255,7 @@ const MD_COMPONENTS: Components = {
     </a>
   ),
   code: (props) => (
-    <code style={{ background: "#f5f5f4", borderRadius: 4, padding: "1px 4px", fontSize: 12 }} {...props} />
+    <code style={{ background: UI.NEUTRAL_BG, borderRadius: 4, padding: "1px 4px", fontSize: 12 }} {...props} />
   ),
 };
 
@@ -312,7 +314,7 @@ function ReplyText({ text, mentioned, sentiment, citedUrls, checks }: { text: st
   const long = (text?.length ?? 0) > REPLY_PREVIEW_CHARS;
   const shown = !text ? null : expanded || !long ? text : previewSlice(text);
   return (
-    <div style={{ fontSize: 13, lineHeight: 1.5, background: "#fafaf9", border: BORDER, borderRadius: 8, padding: "10px 12px" }}>
+    <div style={{ fontSize: 13, lineHeight: 1.5, background: UI.REPLY_BG, border: BORDER, borderRadius: 8, padding: "10px 12px" }}>
       {shown === null ? (
         <em style={{ color: MUTED }}>no response captured</em>
       ) : (
@@ -579,7 +581,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                 <button
                   key={p}
                   onClick={() => togglePlatform(p)}
-                  style={{ padding: "5px 10px", background: on ? "#fff7ed" : CARD, border: on ? `1px solid ${ACCENT}` : BORDER, borderRadius: 999, fontSize: 12, cursor: "pointer", color: on ? ACCENT : MUTED, fontWeight: on ? 600 : 400 }}
+                  style={{ padding: "5px 10px", background: on ? UI.COPPER_BG : CARD, border: on ? `1px solid ${ACCENT}` : BORDER, borderRadius: 999, fontSize: 12, cursor: "pointer", color: on ? ACCENT : MUTED, fontWeight: on ? 600 : 400 }}
                 >
                   {PLATFORM_LABEL[p]}
                 </button>
@@ -610,7 +612,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
       </header>
 
       {balance !== null && balance < 0 && (
-        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: RED, borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 12 }}>
+        <div style={{ background: UI.RED_BG, border: `1px solid ${UI.RED_BORDER}`, color: RED, borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 12 }}>
           Your balance is {balance} credits (scheduled runs billed past zero). Manual runs are blocked until you{" "}
           <a href={`${GEO_ORIGIN}/dashboard`} style={{ color: RED, fontWeight: 600 }}>top up</a>.
         </div>
@@ -826,7 +828,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                         disabled={inLibrary.has(t.name)}
                         onClick={() => void addPrompt(t.name, t.category, fillTemplate(t.template, brand.name))}
                         title={fillTemplate(t.template, brand.name)}
-                        style={{ padding: "6px 10px", background: inLibrary.has(t.name) ? "#f5f5f4" : "#fff7ed", border: BORDER, borderRadius: 999, fontSize: 12, cursor: inLibrary.has(t.name) ? "default" : "pointer", color: inLibrary.has(t.name) ? MUTED : "inherit" }}
+                        style={{ padding: "6px 10px", background: inLibrary.has(t.name) ? UI.NEUTRAL_BG : UI.COPPER_BG, border: BORDER, borderRadius: 999, fontSize: 12, cursor: inLibrary.has(t.name) ? "default" : "pointer", color: inLibrary.has(t.name) ? MUTED : "inherit" }}
                       >
                         {inLibrary.has(t.name) ? `✓ ${t.name}` : t.name}
                       </button>
@@ -902,7 +904,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                         {h.period} · {PLATFORM_LABEL[h.platform] ?? h.platform}
                         {h.attempt > 1 ? ` · attempt ${h.attempt}` : ""}
                         {(i === 0 || history[historyPromptId][i - 1].version !== h.version) && (
-                          <span style={{ marginLeft: 6, padding: "1px 6px", background: "#fff7ed", border: BORDER, borderRadius: 999 }}>v{h.version}</span>
+                          <span style={{ marginLeft: 6, padding: "1px 6px", background: UI.COPPER_BG, border: BORDER, borderRadius: 999 }}>v{h.version}</span>
                         )}
                       </div>
                       <ReplyText text={h.responseText} mentioned={h.brandMentioned} sentiment={h.sentiment} citedUrls={h.citedUrls} />

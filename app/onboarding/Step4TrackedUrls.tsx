@@ -3,9 +3,10 @@
 // Step 4 — publicity URLs (optional). Paste up to 50 URLs, one per line; we
 // show exactly when AI engines cite those pages.
 import { MAX_TRACKED_URLS } from "@/lib/onboarding";
+import { UI } from "@/app/ui";
 
-const BORDER = "1px solid rgba(0,0,0,0.08)";
-const MUTED = "#78716c";
+const BORDER = UI.BORDER_CSS;
+const MUTED = UI.T2;
 
 export default function Step4TrackedUrls({
   trackedUrls,

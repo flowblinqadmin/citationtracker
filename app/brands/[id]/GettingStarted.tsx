@@ -12,13 +12,14 @@ import Link from "next/link";
 import { apiUrl } from "@/lib/api-url";
 import type { TrackerRunFrequency } from "@/lib/types/tracker";
 import { checklistItems, dismissKey } from "@/lib/onboarding-checklist";
+import { UI } from "@/app/ui";
 
-const CARD = "#ffffff";
-const BORDER = "1px solid rgba(0,0,0,0.08)";
-const MUTED = "#78716c";
-const ACCENT = "#b45309";
-const GREEN = "#16a34a";
-const HIGHLIGHT = "#fff7ed";
+const CARD = UI.CARD;
+const BORDER = UI.BORDER_CSS;
+const MUTED = UI.T2;
+const ACCENT = UI.COPPER;
+const GREEN = UI.GREEN;
+const HIGHLIGHT = UI.COPPER_BG;
 
 export default function GettingStarted({
   brandId,

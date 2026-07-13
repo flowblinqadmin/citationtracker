@@ -14,12 +14,13 @@ import {
   DEMO_SOAV,
   DEMO_TOTAL_CITATIONS,
 } from "./demo-data";
+import { UI } from "@/app/ui";
 
-const CARD = "#ffffff";
-const BORDER = "1px solid rgba(0,0,0,0.08)";
-const MUTED = "#78716c";
-const ACCENT = "#b45309";
-const GREEN = "#16a34a";
+const CARD = UI.CARD;
+const BORDER = UI.BORDER_CSS;
+const MUTED = UI.T2;
+const ACCENT = UI.COPPER;
+const GREEN = UI.GREEN;
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
@@ -79,7 +80,7 @@ export default function DemoReport() {
                 <span style={{ fontWeight: v.isBrand ? 700 : 400, color: v.isBrand ? GREEN : "inherit", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {v.name}{v.isBrand ? " · you" : ""}
                 </span>
-                <span style={{ background: "#f5f5f4", borderRadius: 999, height: 10, overflow: "hidden" }}>
+                <span style={{ background: UI.NEUTRAL_BG, borderRadius: 999, height: 10, overflow: "hidden" }}>
                   <span style={{ display: "block", height: "100%", width: pct(v.share), background: v.isBrand ? GREEN : ACCENT, borderRadius: 999 }} />
                 </span>
                 <span style={{ color: MUTED, textAlign: "right" }}>{pct(v.share)}</span>
@@ -96,7 +97,7 @@ export default function DemoReport() {
               const row = DEMO_COVERAGE.find((c) => c.platform === p);
               const mentioned = row?.mentioned ?? false;
               return (
-                <div key={p} style={{ border: BORDER, borderRadius: 8, padding: "10px 12px", textAlign: "center", background: mentioned ? "#f0fdf4" : "#fafaf9" }}>
+                <div key={p} style={{ border: BORDER, borderRadius: 8, padding: "10px 12px", textAlign: "center", background: mentioned ? UI.GREEN_BG : UI.REPLY_BG }}>
                   <div style={{ fontSize: 12, color: MUTED }}>{PLATFORM_LABEL[p] ?? p}</div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: mentioned ? GREEN : MUTED, margin: "2px 0" }}>
                     {mentioned ? "✓ mentioned" : "— absent"}
@@ -126,7 +127,7 @@ export default function DemoReport() {
                     <span style={{ fontWeight: s.isBrand ? 700 : 400, color: s.isBrand ? GREEN : "inherit" }}>{s.page}</span>
                     {s.isBrand ? <span style={{ color: GREEN }}> · you</span> : null}
                     {s.isTracked ? (
-                      <span style={{ marginLeft: 6, padding: "1px 6px", background: "#fff7ed", border: BORDER, borderRadius: 999, fontSize: 11, color: ACCENT }}>tracked</span>
+                      <span style={{ marginLeft: 6, padding: "1px 6px", background: UI.COPPER_BG, border: BORDER, borderRadius: 999, fontSize: 11, color: ACCENT }}>tracked</span>
                     ) : null}
                   </td>
                   <td style={{ color: MUTED }}>{s.platforms.map((p) => PLATFORM_LABEL[p] ?? p).join(" + ")}</td>
@@ -138,7 +139,7 @@ export default function DemoReport() {
         </div>
 
         {/* One tracked-URL "cited" win */}
-        <div style={{ background: "#fff7ed", border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
+        <div style={{ background: UI.COPPER_BG, border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
           <div style={{ fontSize: 12, color: MUTED, marginBottom: 4 }}>Tracked publicity URL — cited</div>
           <div style={{ fontSize: 14 }}>
             <span style={{ color: ACCENT, fontWeight: 600, overflowWrap: "anywhere" }}>{DEMO_TRACKED_HIT.page}</span>

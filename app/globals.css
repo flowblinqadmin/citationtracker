@@ -1,6 +1,8 @@
 :root {
-  --background: #faf8f5;
-  --foreground: #1c1917;
+  /* Aligned to geo's dashboard surface (app/dashboard/page.tsx BG/TEXT) so the
+     path-routed transition between geo and /citations is seamless. */
+  --background: #f5f5f7;
+  --foreground: #1d1d1f;
 }
 
 * {

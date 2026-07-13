@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiUrl } from "@/lib/api-url";
+import { UI } from "./ui";
 
 interface Brand {
   id: string;
@@ -14,10 +15,10 @@ interface Brand {
   createdAt: string;
 }
 
-const CARD = "#ffffff";
-const BORDER = "1px solid rgba(0,0,0,0.08)";
-const MUTED = "#78716c";
-const ACCENT = "#b45309";
+const CARD = UI.CARD;
+const BORDER = UI.BORDER_CSS;
+const MUTED = UI.T2;
+const ACCENT = UI.COPPER;
 
 export default function BrandListPage() {
   const router = useRouter();

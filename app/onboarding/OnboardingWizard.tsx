@@ -28,11 +28,12 @@ import Step2Competitors from "./Step2Competitors";
 import Step3Prompts from "./Step3Prompts";
 import Step4TrackedUrls from "./Step4TrackedUrls";
 import Step5 from "./Step5";
+import { UI } from "@/app/ui";
 
-const CARD = "#ffffff";
-const BORDER = "1px solid rgba(0,0,0,0.08)";
-const MUTED = "#78716c";
-const ACCENT = "#b45309";
+const CARD = UI.CARD;
+const BORDER = UI.BORDER_CSS;
+const MUTED = UI.T2;
+const ACCENT = UI.COPPER;
 
 type CommitStage = "" | "brand" | "prompts" | "tracked-urls" | "run" | "done";
 
@@ -197,7 +198,7 @@ export default function OnboardingWizard() {
           return (
             <span
               key={n}
-              style={{ padding: "5px 12px", borderRadius: 999, fontSize: 12, border: active ? `1px solid ${ACCENT}` : BORDER, background: active || done ? "#fff7ed" : CARD, color: active || done ? ACCENT : MUTED, fontWeight: active ? 600 : 400 }}
+              style={{ padding: "5px 12px", borderRadius: 999, fontSize: 12, border: active ? `1px solid ${ACCENT}` : BORDER, background: active || done ? UI.COPPER_BG : CARD, color: active || done ? ACCENT : MUTED, fontWeight: active ? 600 : 400 }}
             >
               {n}
             </span>

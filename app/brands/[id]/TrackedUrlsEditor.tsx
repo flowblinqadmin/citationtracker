@@ -11,13 +11,14 @@ import { toast } from "sonner";
 import { apiUrl } from "@/lib/api-url";
 import { PLATFORM_LABEL, PLATFORM_ORDER } from "./platforms";
 import type { TrackerPlatform } from "@/lib/types/tracker";
+import { UI } from "@/app/ui";
 
-const CARD = "#ffffff";
-const BORDER = "1px solid rgba(0,0,0,0.08)";
-const MUTED = "#78716c";
-const ACCENT = "#b45309";
-const GREEN = "#16a34a";
-const RED = "#dc2626";
+const CARD = UI.CARD;
+const BORDER = UI.BORDER_CSS;
+const MUTED = UI.T2;
+const ACCENT = UI.COPPER;
+const GREEN = UI.GREEN;
+const RED = UI.RED;
 
 const MAX_TRACKED_URLS = 50;
 
@@ -49,11 +50,11 @@ function StatusBadge({ stats }: { stats: TrackedUrlStats }) {
     const chips = [...stats.platforms].sort((a, b) => PLATFORM_ORDER.indexOf(a as TrackerPlatform) - PLATFORM_ORDER.indexOf(b as TrackerPlatform));
     return (
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, fontSize: 12 }}>
-        <span style={{ background: "#f0fdf4", color: GREEN, border: `1px solid ${GREEN}`, borderRadius: 999, padding: "2px 10px", fontWeight: 700 }}>
+        <span style={{ background: UI.GREEN_BG, color: GREEN, border: `1px solid ${GREEN}`, borderRadius: 999, padding: "2px 10px", fontWeight: 700 }}>
           Cited {stats.exactCount}×
         </span>
         {chips.map((p) => (
-          <span key={p} style={{ background: "#fff7ed", color: ACCENT, border: BORDER, borderRadius: 999, padding: "1px 8px", fontWeight: 600 }}>
+          <span key={p} style={{ background: UI.COPPER_BG, color: ACCENT, border: BORDER, borderRadius: 999, padding: "1px 8px", fontWeight: 600 }}>
             {PLATFORM_LABEL[p] ?? p}
           </span>
         ))}
@@ -64,11 +65,11 @@ function StatusBadge({ stats }: { stats: TrackedUrlStats }) {
   if (stats.domainCount > 0) {
     return (
       <span style={{ fontSize: 12, color: MUTED }}>
-        Outlet cited {stats.domainCount}× <span style={{ color: "#a8a29e" }}>(different page)</span>
+        Outlet cited {stats.domainCount}× <span style={{ color: UI.T3 }}>(different page)</span>
       </span>
     );
   }
-  return <span style={{ fontSize: 12, color: "#a8a29e" }}>Not cited yet</span>;
+  return <span style={{ fontSize: 12, color: UI.T3 }}>Not cited yet</span>;
 }
 
 export default function TrackedUrlsEditor({ clientId }: { clientId: string }) {

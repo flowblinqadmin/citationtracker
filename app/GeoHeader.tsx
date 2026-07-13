@@ -15,14 +15,15 @@
 import { useEffect, useState } from "react";
 import { apiUrl } from "@/lib/api-url";
 import { createClient } from "@/lib/supabase/client";
+import { UI } from "@/app/ui";
 
-// ── geo design-system constants (copied 1:1 from geo dashboard) ──────────────
-const COPPER = "#c2652a";
-const HEADER_BG = "#FAF9F5";
-const HEADER_BORDER = "rgba(0,0,0,0.06)";
-const TEXT = "#1d1d1f";
-const T2 = "#86868b";
-const FONT_STACK = "var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+// ── geo design-system constants (centralized in app/ui.ts, geo-canonical) ────
+const COPPER = UI.COPPER;
+const HEADER_BG = UI.HEADER_BG;
+const HEADER_BORDER = UI.HEADER_BORDER;
+const TEXT = UI.TEXT;
+const T2 = UI.T2;
+const FONT_STACK = UI.FONT;
 
 interface TeamInfo {
   email: string | null;
