@@ -13,7 +13,15 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Inter-first, matching geo's dashboard content. geo's dashboard <main> sets
+     fontFamily "'Inter', system-ui, -apple-system, ..." (Inter loaded via a
+     Google-Fonts <link>) so every dashboard element renders in Inter. CE loads
+     Inter via next/font (--font-inter, layout.tsx) but the body previously
+     forced -apple-system, so CE content rendered in San Francisco while geo
+     rendered in Inter — the visible "fonts are not the same". Anchoring the
+     body to the Inter stack makes every CE component inherit Inter, matching
+     geo 1:1. Keep in lockstep with app/ui.ts UI.FONT. */
+  font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -22,4 +30,12 @@ input,
 select,
 textarea {
   font-family: inherit;
+}
+
+/* geo's dashboard inputs set color:#1d1d1f (TEXT); CE inputs had no explicit
+   color and fell back to UA black. Match geo's text hierarchy. */
+input,
+select,
+textarea {
+  color: var(--foreground);
 }
