@@ -63,6 +63,19 @@ describe("anonymous-public paths (no session constructed)", () => {
     expect(res.status).toBe(200);
     expect(updateSessionMock).not.toHaveBeenCalled();
   });
+
+  it("/api/agent/one-shot-citation passes without session (Bearer AGENT_SERVICE_TOKEN verified in the route)", async () => {
+    const res = await middleware(req("/api/agent/one-shot-citation"));
+    expect(res.status).toBe(200);
+    expect(updateSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("a different /api/agent/* path is NOT public (default-deny still applies)", async () => {
+    updateSessionMock.mockResolvedValue(NextResponse.next()); // no x-user-id
+    const res = await middleware(req("/api/agent/other"));
+    expect(res.status).toBe(401);
+    expect(updateSessionMock).toHaveBeenCalled();
+  });
 });
 
 describe("session-gated paths — unauthenticated", () => {

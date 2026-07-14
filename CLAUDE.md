@@ -123,6 +123,17 @@ Node path on this machine: `/opt/homebrew/bin/node`.
   `citation_run` / `citation_run_refund` / `citation_redebit` (geo precedent:
   BB-03 uses site_id for Stripe session ids). Enforced by a partial unique
   index migration.
+- **Billed agent one-shot** (`POST /api/agent/one-shot-citation`, geo v1 JWT
+  path): reuses `debitForRun` / `refundForRun` with a synthetic
+  `site_id = osc_<nanoid>` under the SAME `citation_run` / `citation_run_refund`
+  types — so it rides the existing partial unique index with **no new ledger
+  types and no migration**. Cost = `prompts × requested-models ×
+  CREDITS_PER_PROMPT_MODEL`, debited before execution; unconfigured models are
+  partial-refunded (`missing × prompts × CREDITS_PER_PROMPT_MODEL`) and a thrown
+  execution is fully refunded. NO `tracker.runs`/`orgs` rows — pure `public.*`
+  billing. (New `citation_run_api*` types were deliberately NOT introduced: they
+  would fall outside the partial index and silently lose idempotency, forcing a
+  migration.)
 - Competitors (≤10 name+domain rows, CompetitorEditor on the Overview tab)
   drive Share of AI voice + the competitor table; stats are computed live by
   domain, so past runs light up retroactively when competitors change.
@@ -171,6 +182,8 @@ Keep `@supabase/*` versions in lockstep with geo (cookie format).
 | `QSTASH_CURRENT_SIGNING_KEY` / `QSTASH_NEXT_SIGNING_KEY` | Worker signature verification |
 | `CITATIONS_WORKER_BASE` | Public base of THIS service (direct vercel.app URL incl. /citations basePath) |
 | `FIRECRAWL_API_KEY` | Citation verification + AI Search scrapes |
+| `AGENT_SERVICE_TOKEN` | Bearer secret for the UNBILLED agent surface `POST /api/agent/one-shot-citation` (called by agent-storefront's x402 gateway; x402 collects spend upstream). Constant-time compared; ≥32 chars (`openssl rand -hex 16`). Unset → route 503s. Distinct from `CRON_SECRET` — NOT shared with geo |
+| `API_JWT_SECRET` | HS256 secret verifying geo v1 customer API JWTs on the BILLED path of `POST /api/agent/one-shot-citation` (dual-auth). Same token geo mints in its `lib/api-auth.ts` — **must EQUAL geo's `API_JWT_SECRET`** (cross-project shared secret, like `CRON_SECRET`). `openssl rand -hex 32` (≥32 chars). Unset → billed mode unavailable (a non-service bearer resolves to 401, never leaking that billing is off); the unbilled service-token path is unaffected |
 | `GEO_TRACKER_LIVE` | Transition switch. While unset/anything-but-`"false"`, the scheduler cron does ONLY the retention purge and leaves scheduling + recovery to geo's still-live cron. Phase C sets it `"false"` (CE takes over) in the SAME change that deletes geo's cron |
 
 Vercel project: `citationtracker` (adithya-raos-projects-ccfb49af).

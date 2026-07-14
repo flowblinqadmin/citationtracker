@@ -34,6 +34,11 @@ const PUBLIC_PATHS = [
   /^\/favicon\.ico$/,
   /^\/icon\.svg$/,
   /^\/api\/cron\//, // CRON_SECRET auth inside the route (lib/cron-auth)
+  // Agent one-shot surface: called by the agent-storefront x402 gateway with a
+  // Bearer AGENT_SERVICE_TOKEN, NOT a Supabase session. The route does its own
+  // constant-time Bearer auth (lib/agent-auth) — the default-deny session gate
+  // would 401 it before it could. Deliberately public here; auth lives in-route.
+  /^\/api\/agent\/one-shot-citation$/,
 ];
 
 const SECURITY_HEADERS = {
