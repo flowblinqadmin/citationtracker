@@ -19,6 +19,7 @@ const CARD = UI.CARD;
 const BORDER = UI.BORDER_CSS;
 const MUTED = UI.T2;
 const ACCENT = UI.COPPER;
+const ON_ACCENT = UI.ON_ACCENT;
 
 export default function BrandListPage() {
   const router = useRouter();
@@ -61,7 +62,7 @@ export default function BrandListPage() {
       <div style={{ marginBottom: 28 }}>
         <Link
           href="/onboarding"
-          style={{ padding: "10px 18px", background: ACCENT, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+          style={{ padding: "10px 18px", background: ACCENT, color: ON_ACCENT, border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
         >
           Add brand
         </Link>

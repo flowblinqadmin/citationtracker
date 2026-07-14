@@ -34,6 +34,7 @@ const CARD = UI.CARD;
 const BORDER = UI.BORDER_CSS;
 const MUTED = UI.T2;
 const ACCENT = UI.COPPER;
+const ON_ACCENT = UI.ON_ACCENT;
 
 type CommitStage = "" | "brand" | "prompts" | "tracked-urls" | "run" | "done";
 
@@ -282,7 +283,7 @@ export default function OnboardingWizard() {
               <button
                 onClick={() => goToStep(clampStep(state.step + 1))}
                 disabled={disabled}
-                style={{ padding: "10px 18px", background: ACCENT, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.5 : 1 }}
+                style={{ padding: "10px 18px", background: ACCENT, color: ON_ACCENT, border: "none", borderRadius: 8, fontSize: 14, cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.5 : 1 }}
               >
                 {waitingOnSuggest ? "Analyzing your site…" : state.step === 4 ? "Launch" : "Continue"}
               </button>

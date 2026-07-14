@@ -1,8 +1,8 @@
 :root {
-  /* Aligned to geo's dashboard surface (app/dashboard/page.tsx BG/TEXT) so the
-     path-routed transition between geo and /citations is seamless. */
+  /* Aligned to geo's dashboard surface (app/dashboard/page.tsx BG) and the
+     Citations colour spec's Ink text tone. Keep in lockstep with app/ui.ts UI.TEXT. */
   --background: #f5f5f7;
-  --foreground: #1d1d1f;
+  --foreground: #1A1A2E;
 }
 
 * {

@@ -19,6 +19,7 @@ import { UI } from "@/app/ui";
 
 // ── geo design-system constants (centralized in app/ui.ts, geo-canonical) ────
 const COPPER = UI.COPPER;
+const ON_ACCENT = UI.ON_ACCENT;
 const HEADER_BG = UI.HEADER_BG;
 const HEADER_BORDER = UI.HEADER_BORDER;
 const TEXT = UI.TEXT;
@@ -106,7 +107,7 @@ export default function GeoHeader({ geoOrigin }: { geoOrigin: string }) {
           href={`${geoOrigin}/dashboard`}
           style={{
             background: COPPER,
-            color: "#fff",
+            color: ON_ACCENT,
             border: "none",
             borderRadius: 8,
             padding: "6px 14px",
@@ -123,7 +124,7 @@ export default function GeoHeader({ geoOrigin }: { geoOrigin: string }) {
           onClick={() => void handleSignOut()}
           style={{
             background: "transparent",
-            border: "1px solid rgba(194, 101, 42, 0.25)",
+            border: "1px solid rgba(255, 97, 0, 0.25)",
             borderRadius: 8,
             padding: "6px 14px",
             color: COPPER,

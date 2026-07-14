@@ -15,8 +15,10 @@ import { UI } from "@/app/ui";
 
 const CARD = UI.CARD;
 const BORDER = UI.BORDER_CSS;
-const MUTED = UI.T2;
+const MUTED = UI.T2; // Mid Grey — body copy
+const FAINT = UI.T3; // Steel — counter
 const ACCENT = UI.COPPER;
+const ON_ACCENT = UI.ON_ACCENT;
 const GREEN = UI.GREEN;
 const RED = UI.RED;
 
@@ -161,14 +163,18 @@ export default function TrackedUrlsEditor({ clientId }: { clientId: string }) {
   return (
     <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <div style={{ fontSize: 12, color: MUTED }}>
-          Tracked URLs ({draft.length}/{MAX_TRACKED_URLS}) — press/blog/launch pages you want cited by AI. Each shows whether it&apos;s showing up.
+        <div>
+          <span style={{ fontSize: 13, fontWeight: 600, color: UI.TEXT }}>Tracked URLs</span>{" "}
+          <span style={{ fontSize: 12, color: FAINT }}>({draft.length}/{MAX_TRACKED_URLS})</span>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
+            Press/blog/launch pages you want cited by AI. Each shows whether it&apos;s showing up.
+          </div>
         </div>
         {dirty && (
           <button
             onClick={() => void save()}
             disabled={saving}
-            style={{ padding: "6px 14px", background: ACCENT, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer", opacity: saving ? 0.5 : 1 }}
+            style={{ padding: "6px 14px", background: ACCENT, color: ON_ACCENT, border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer", opacity: saving ? 0.5 : 1 }}
           >
             {saving ? "Saving…" : "Save URLs"}
           </button>

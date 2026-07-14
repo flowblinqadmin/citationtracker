@@ -12,8 +12,10 @@ import { UI } from "@/app/ui";
 
 const CARD = UI.CARD;
 const BORDER = UI.BORDER_CSS;
-const MUTED = UI.T2;
+const MUTED = UI.T2; // Mid Grey — body copy
+const FAINT = UI.T3; // Steel — counter
 const ACCENT = UI.COPPER;
+const ON_ACCENT = UI.ON_ACCENT;
 const RED = UI.RED;
 
 const MAX_COMPETITORS = 10;
@@ -79,14 +81,18 @@ export default function CompetitorEditor({
   return (
     <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <div style={{ fontSize: 12, color: MUTED }}>
-          Competitors ({rows.length}/{MAX_COMPETITORS}) — drive Share of AI voice and the competitor citation table
+        <div>
+          <span style={{ fontSize: 13, fontWeight: 600, color: UI.TEXT }}>Competitors</span>{" "}
+          <span style={{ fontSize: 12, color: FAINT }}>({rows.length}/{MAX_COMPETITORS})</span>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
+            Drive Share of AI voice and the competitor citation table
+          </div>
         </div>
         {dirty && (
           <button
             onClick={() => void save()}
             disabled={saving}
-            style={{ padding: "6px 14px", background: ACCENT, color: "#fff", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer", opacity: saving ? 0.5 : 1 }}
+            style={{ padding: "6px 14px", background: ACCENT, color: ON_ACCENT, border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer", opacity: saving ? 0.5 : 1 }}
           >
             {saving ? "Saving…" : "Save competitors"}
           </button>

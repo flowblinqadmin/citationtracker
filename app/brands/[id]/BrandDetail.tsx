@@ -91,9 +91,12 @@ function CheckBadge({ check }: { check: CheckStatus | null | undefined }) {
 
 const CARD = UI.CARD;
 const BORDER = UI.BORDER_CSS;
-const MUTED = UI.T2;
-const ACCENT = UI.COPPER;
-const GREEN = UI.GREEN;
+const MUTED = UI.T2; // Mid Grey — labels, body copy
+const FAINT = UI.T3; // Steel — metadata, counters, empty states, breadcrumbs
+const ACCENT = UI.COPPER; // Burnt Orange
+const ON_ACCENT = UI.ON_ACCENT; // Cloud White — text on a filled accent background
+const GREEN = UI.GREEN; // Success Green — semantic success
+const BRAND_GREEN = UI.BRAND_GREEN; // Robinhood Green — brand-emphasis accent
 const RED = UI.RED;
 const ORANGE = UI.ORANGE;
 
@@ -128,7 +131,7 @@ interface HistoryRow {
 const SENTIMENT_STYLE: Record<string, { color: string; bg: string; label: string }> = {
   positive: { color: GREEN, bg: UI.GREEN_BG, label: "positive" },
   negative: { color: RED, bg: UI.RED_BG, label: "negative" },
-  neutral: { color: MUTED, bg: UI.NEUTRAL_BG, label: "neutral" },
+  neutral: { color: FAINT, bg: UI.NEUTRAL_BG, label: "neutral" },
 };
 
 function SentimentChip({ sentiment }: { sentiment: string | null }) {
@@ -198,7 +201,7 @@ function SentimentSplit({ counts, onSelect }: { counts: SentimentCounts; onSelec
 }
 
 function Sparkline({ values, color }: { values: number[]; color: string }) {
-  if (values.length < 2) return <span style={{ color: MUTED, fontSize: 12 }}>needs 2+ runs</span>;
+  if (values.length < 2) return <span style={{ color: FAINT, fontSize: 12 }}>needs 2+ runs</span>;
   const w = 180;
   const h = 44;
   const pts = values.map((v, i) => `${(i / (values.length - 1)) * (w - 4) + 2},${h - 2 - v * (h - 8)}`).join(" ");
@@ -214,7 +217,7 @@ function MetricCard({ label, value, sub }: { label: string; value: string; sub?:
     <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px", flex: "1 1 150px" }}>
       <div style={{ fontSize: 12, color: MUTED }}>{label}</div>
       <div style={{ fontSize: 24, fontWeight: 700, margin: "4px 0" }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: MUTED }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12, color: FAINT }}>{sub}</div>}
     </div>
   );
 }
@@ -349,6 +352,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
   const [customText, setCustomText] = useState("");
   const [running, setRunning] = useState(false);
   const [selectedPlatforms, setSelectedPlatforms] = useState<TrackerPlatform[]>([...PLATFORM_ORDER]);
+  const [hoveredPlatform, setHoveredPlatform] = useState<TrackerPlatform | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [openRunId, setOpenRunId] = useState<string | null>(null);
   const [replies, setReplies] = useState<Record<string, ReplyRow[]>>({});
@@ -566,22 +570,34 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
 
   return (
     <main style={{ maxWidth: 860, margin: "0 auto", padding: "40px 24px" }}>
-      <Link href="/" style={{ color: MUTED, fontSize: 13, textDecoration: "none" }}>← Brands</Link>
+      <Link href="/" style={{ color: FAINT, fontSize: 13, textDecoration: "none" }}>← Brands</Link>
 
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "12px 0 8px" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 24 }}>{brand?.name ?? "…"}</h1>
-          {brand?.domain && <span style={{ color: MUTED, fontSize: 13 }}>{brand.domain}</span>}
+          {brand?.domain && <span style={{ color: FAINT, fontSize: 13 }}>{brand.domain}</span>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ display: "flex", gap: 4 }} title="Models the next manual run queries">
             {PLATFORM_ORDER.map((p) => {
               const on = selectedPlatforms.includes(p);
+              const hovered = hoveredPlatform === p;
               return (
                 <button
                   key={p}
                   onClick={() => togglePlatform(p)}
-                  style={{ padding: "5px 10px", background: on ? UI.COPPER_BG : CARD, border: on ? `1px solid ${ACCENT}` : BORDER, borderRadius: 999, fontSize: 12, cursor: "pointer", color: on ? ACCENT : MUTED, fontWeight: on ? 600 : 400 }}
+                  onMouseEnter={() => setHoveredPlatform(p)}
+                  onMouseLeave={() => setHoveredPlatform((cur) => (cur === p ? null : cur))}
+                  style={{
+                    padding: "5px 10px",
+                    background: on ? ACCENT : hovered ? UI.COPPER_BG : CARD,
+                    border: on || hovered ? `1px solid ${ACCENT}` : BORDER,
+                    borderRadius: 999,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    color: on ? ON_ACCENT : hovered ? ACCENT : MUTED,
+                    fontWeight: on ? 600 : 400,
+                  }}
                 >
                   {PLATFORM_LABEL[p]}
                 </button>
@@ -604,7 +620,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
             onClick={() => void runNow()}
             disabled={running || prompts.length === 0 || hasActiveRun}
             title={prompts.length === 0 ? "Add prompts first" : undefined}
-            style={{ padding: "10px 18px", background: ACCENT, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", opacity: running || prompts.length === 0 || hasActiveRun ? 0.5 : 1 }}
+            style={{ padding: "10px 18px", background: ACCENT, color: ON_ACCENT, border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", opacity: running || prompts.length === 0 || hasActiveRun ? 0.5 : 1 }}
           >
             {hasActiveRun ? "Run in progress…" : `Run now · ${runCost} credits`}
           </button>
@@ -623,7 +639,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
           <button
             key={t}
             onClick={() => setTab(t)}
-            style={{ padding: "8px 2px", background: "none", border: "none", borderBottom: tab === t ? `2px solid ${ACCENT}` : "2px solid transparent", fontSize: 14, cursor: "pointer", color: tab === t ? "inherit" : MUTED }}
+            style={{ padding: "8px 2px", background: "none", border: "none", borderBottom: tab === t ? `2px solid ${BRAND_GREEN}` : "2px solid transparent", fontSize: 14, cursor: "pointer", color: tab === t ? UI.TEXT : MUTED }}
           >
             {t === "overview" ? "Overview" : t === "prompts" ? `Prompts (${prompts.length}/30)` : `Runs (${runs.length})`}
           </button>
@@ -705,13 +721,13 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title={sSrc.url}
-                                style={{ fontWeight: sSrc.brand ? 700 : 400, color: sSrc.brand ? GREEN : ACCENT }}
+                                style={{ fontWeight: sSrc.brand ? 700 : 400, color: ACCENT }}
                               >
                                 {sSrc.page.length > 70 ? `${sSrc.page.slice(0, 70)}…` : sSrc.page}{sSrc.brand ? " · you" : ""}
                               </a>
                               {" "}<CheckBadge check={sSrc.check} />
                             </span>
-                            <span style={{ color: MUTED, whiteSpace: "nowrap" }}>
+                            <span style={{ color: FAINT, whiteSpace: "nowrap" }}>
                               {sSrc.platforms.map((p) => PLATFORM_LABEL[p] ?? p).join(" + ")} · {sSrc.count}×
                             </span>
                           </div>
@@ -730,8 +746,16 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                           <div key={row.promptId}>
                             <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                               <span style={{ overflowWrap: "anywhere" }}>{row.promptText}</span>
-                              <span style={{ whiteSpace: "nowrap", fontWeight: 600, color: !row.present ? MUTED : row.brandMentioned ? GREEN : RED }}>
-                                {!row.present ? "no AI Overview" : row.brandMentioned ? "✓ brand in overview" : "✗ brand absent"}
+                              <span style={{ whiteSpace: "nowrap", fontWeight: 600 }}>
+                                {!row.present ? (
+                                  <span style={{ color: MUTED }}>no AI Overview</span>
+                                ) : row.brandMentioned ? (
+                                  <>
+                                    <span style={{ color: GREEN }}>✓</span> <span style={{ color: BRAND_GREEN }}>brand in overview</span>
+                                  </>
+                                ) : (
+                                  <span style={{ color: RED }}>✗ brand absent</span>
+                                )}
                               </span>
                             </div>
                             {row.present && row.citedUrls.length > 0 && (
@@ -740,7 +764,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                                 {row.citedUrls.slice(0, 6).map((c, i) => (
                                   <span key={c.url}>
                                     {i > 0 && " · "}
-                                    <a href={c.url} target="_blank" rel="noopener noreferrer" style={{ color: hostOf(c.url)?.endsWith(brand?.domain?.replace(/^www\./, "") ?? "\u0000") ? GREEN : ACCENT }}>
+                                    <a href={c.url} target="_blank" rel="noopener noreferrer" style={{ color: ACCENT }}>
                                       {hostOf(c.url) ?? c.label}
                                     </a>
                                   </span>
@@ -767,7 +791,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                           {m.platformBreakdown.map((p) => (
                             <tr key={p.platform} style={{ borderTop: BORDER }}>
                               <td style={{ padding: "6px 0" }}>{PLATFORM_LABEL[p.platform] ?? p.platform}</td>
-                              <td><strong>{pct(p.brandMentionRate)}</strong></td>
+                              <td><strong style={{ color: p.brandMentionRate > 0 ? BRAND_GREEN : FAINT }}>{pct(p.brandMentionRate)}</strong></td>
                             </tr>
                           ))}
                         </tbody>

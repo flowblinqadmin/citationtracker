@@ -14,6 +14,7 @@ const CARD = UI.CARD;
 const BORDER = UI.BORDER_CSS;
 const MUTED = UI.T2;
 const ACCENT = UI.COPPER;
+const ON_ACCENT = UI.ON_ACCENT;
 
 const MAX_CUSTOM_LEN = 500;
 
@@ -87,7 +88,7 @@ export default function Step3Prompts({
         <button
           onClick={addCustom}
           disabled={!custom.trim() || prompts.length >= MAX_PROMPTS}
-          style={{ padding: "10px 18px", background: ACCENT, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", opacity: !custom.trim() || prompts.length >= MAX_PROMPTS ? 0.5 : 1 }}
+          style={{ padding: "10px 18px", background: ACCENT, color: ON_ACCENT, border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", opacity: !custom.trim() || prompts.length >= MAX_PROMPTS ? 0.5 : 1 }}
         >
           Add
         </button>

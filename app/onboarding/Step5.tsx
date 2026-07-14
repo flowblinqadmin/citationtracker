@@ -16,6 +16,7 @@ import { UI } from "@/app/ui";
 const BORDER = UI.BORDER_CSS;
 const MUTED = UI.T2;
 const ACCENT = UI.COPPER;
+const ON_ACCENT = UI.ON_ACCENT;
 const RED = UI.RED;
 
 const STAGE_COPY: Record<string, string> = {
@@ -124,7 +125,7 @@ export default function Step5(props: Step5Props) {
         </div>
         <button
           onClick={() => void commit()}
-          style={{ padding: "10px 18px", background: ACCENT, color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer" }}
+          style={{ padding: "10px 18px", background: ACCENT, color: ON_ACCENT, border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer" }}
         >
           Run my first report ({cost} credits)
         </button>
@@ -140,7 +141,7 @@ export default function Step5(props: Step5Props) {
         <p style={{ color: RED, fontSize: 14, marginTop: 8 }}>{commitError}</p>
         <button
           onClick={() => void commit()}
-          style={{ marginTop: 12, padding: "10px 18px", background: ACCENT, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer" }}
+          style={{ marginTop: 12, padding: "10px 18px", background: ACCENT, color: ON_ACCENT, border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer" }}
         >
           Retry
         </button>
@@ -171,7 +172,7 @@ export default function Step5(props: Step5Props) {
         {brandId && (
           <Link
             href={`/brands/${brandId}`}
-            style={{ display: "inline-block", marginTop: 12, padding: "10px 18px", background: ACCENT, color: "#fff", borderRadius: 8, fontSize: 14, textDecoration: "none" }}
+            style={{ display: "inline-block", marginTop: 12, padding: "10px 18px", background: ACCENT, color: ON_ACCENT, borderRadius: 8, fontSize: 14, textDecoration: "none" }}
           >
             Go to your brand
           </Link>
@@ -195,7 +196,7 @@ export default function Step5(props: Step5Props) {
         {brandId && (
           <Link
             href={`/brands/${brandId}`}
-            style={{ display: "inline-block", padding: "10px 18px", background: ACCENT, color: "#fff", borderRadius: 8, fontSize: 15, fontWeight: 600, textDecoration: "none" }}
+            style={{ display: "inline-block", padding: "10px 18px", background: ACCENT, color: ON_ACCENT, borderRadius: 8, fontSize: 15, fontWeight: 600, textDecoration: "none" }}
           >
             View my brand report
           </Link>
@@ -217,7 +218,7 @@ export default function Step5(props: Step5Props) {
       </p>
       <button
         onClick={() => setShowDemo((v) => !v)}
-        style={{ marginTop: 16, padding: "10px 18px", background: ACCENT, color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer" }}
+        style={{ marginTop: 16, padding: "10px 18px", background: ACCENT, color: ON_ACCENT, border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer" }}
       >
         {showDemo ? "Hide the demo report" : "Explore the demo report"}
       </button>
