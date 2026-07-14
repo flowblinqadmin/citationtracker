@@ -5,9 +5,12 @@
 // humanizer) stays in geo — this service builds its keyword sets in
 // lib/tracker-db.ts at brand creation.
 //
-// detectMention's logic is verbatim: no-knowledge guard, longest-first keyword
-// scan with the ambiguity proximity check, domain-URL fallback, lexical
-// sentiment window, and numbered-list position detection.
+// detectMention's logic DIVERGES from geo (2026-07-14): geo's no-knowledge
+// guard is global (any hedge phrase anywhere → no mention), which zeroed real
+// Perplexity/Claude mentions; here it is sentence-scoped. Do NOT re-sync this
+// file from geo. Unchanged from geo: longest-first keyword scan with the
+// ambiguity proximity check, domain-URL fallback, lexical sentiment window,
+// and numbered-list position detection.
 
 import type { BrandKeywords } from "@/lib/types/tracker";
 export type { BrandKeywords };
@@ -86,10 +89,17 @@ export function detectMention(
   }
 
   const cats = categoryKeywords ?? [];
-  let match: RegExpExecArray | null = null;
 
-  // Guard: if the model explicitly says it doesn't know, that's not a real mention
-  const lowerResponse = responseText.toLowerCase();
+  // No-knowledge guard, SCOPED to the sentence of each match.
+  //
+  // These phrases signal the model is disclaiming knowledge. The guard must NOT
+  // suppress a reply that affirmatively names the brand elsewhere while hedging
+  // about *some* sources — Perplexity/Claude run web-search + the grounded system
+  // prompt and routinely emit a hedge phrase in one sentence while genuinely
+  // citing the brand in another. So a hedge only invalidates a brand match when
+  // the match sits in the SAME sentence as the hedge (e.g. a reply that ONLY says
+  // "I couldn't find information about <brand>"). An affirmative mention in a
+  // clean sentence always wins.
   const noKnowledgePatterns = [
     "i don't have enough information",
     "i don't have reliable information",
@@ -101,10 +111,24 @@ export function detectMention(
     "no information available",
     "i'm unable to provide details",
     "i could not find",
+    "i couldn't find",
   ];
-  if (noKnowledgePatterns.some(p => lowerResponse.includes(p))) {
-    return { mentioned: false, position: null, sentiment: "neutral" };
-  }
+
+  // True when the sentence containing `index` disclaims knowledge. Sentence
+  // bounds are the nearest [.!?\n] on either side; every hedge phrase lives
+  // within a single sentence (none contain sentence terminators).
+  const isHedgedAt = (index: number): boolean => {
+    let start = 0;
+    for (let i = index; i >= 0; i--) {
+      if (/[.!?\n]/.test(responseText[i])) { start = i + 1; break; }
+    }
+    let end = responseText.length;
+    for (let i = index; i < responseText.length; i++) {
+      if (/[.!?\n]/.test(responseText[i])) { end = i; break; }
+    }
+    const sentence = responseText.slice(start, end).toLowerCase();
+    return noKnowledgePatterns.some(p => sentence.includes(p));
+  };
 
   // Pre-compile all keyword regexes once (not inside the loop)
   const compiledKeywords = keywords.map(keyword => ({
@@ -112,9 +136,13 @@ export function detectMention(
     regex: new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"),
   }));
 
+  let match: RegExpExecArray | null = null; // an affirmative (non-hedged) match
+
+  // Iterate ALL occurrences of each keyword so a brand named in both a hedge
+  // sentence and a clean sentence still resolves to the clean (affirmative) one.
   for (const { keyword, regex } of compiledKeywords) {
-    const m = regex.exec(responseText);
-    if (m) {
+    let m: RegExpExecArray | null;
+    while ((m = regex.exec(responseText)) !== null) {
       if (isAmbiguous) {
         // Require a category keyword within 300-char window
         const start = Math.max(0, m.index - 300);
@@ -123,30 +151,32 @@ export function detectMention(
         const hasCategory = cats.some(cat =>
           context.includes(cat.toLowerCase()),
         );
-        if (hasCategory) {
-          match = m;
-          break;
-        }
-        // else continue to next keyword
-      } else {
-        match = m;
-        break;
+        if (!hasCategory) continue; // not a valid candidate for this brand
       }
+      if (isHedgedAt(m.index)) continue; // keep scanning for an affirmative occurrence
+      match = m;
+      break;
     }
+    if (match) break;
   }
 
-  // Domain URL fallback
+  // Domain URL fallback (same hedge scoping)
   if (!match) {
     const domainRegex = new RegExp(
       domain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
       "gi",
     );
-    const dm = domainRegex.exec(responseText);
-    if (dm) {
+    let dm: RegExpExecArray | null;
+    while ((dm = domainRegex.exec(responseText)) !== null) {
+      if (isHedgedAt(dm.index)) continue;
       match = dm;
+      break;
     }
   }
 
+  // No affirmative match: the brand was either absent, or named ONLY inside a
+  // hedge sentence ("I couldn't find information about <brand>") — both are
+  // no-mention. This is the guard's preserved purpose.
   if (!match) {
     return { mentioned: false, position: null, sentiment: "neutral" };
   }

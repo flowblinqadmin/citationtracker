@@ -179,3 +179,50 @@ export function canProceed(step: number, state: WizardState): boolean {
 export function clampStep(step: number): WizardStep {
   return Math.max(1, Math.min(5, step)) as WizardStep;
 }
+
+/** The /api/brands POST body the wizard sends. */
+export interface BrandInput {
+  name: string;
+  domain: string | null;
+  competitors: WizardCompetitor[];
+  runFrequency: TrackerRunFrequency;
+}
+
+/** Build the brand-creation payload from wizard state — the single source for
+ *  both the launch commit and the Skip shortcut, so the two never diverge. */
+export function buildBrandInput(state: WizardState): BrandInput {
+  return {
+    name: state.brandName.trim(),
+    domain: normalizeDomain(state.domain),
+    competitors: state.competitors
+      .filter((c) => c.name.trim() && normalizeDomain(c.domain))
+      .map((c) => ({ name: c.name.trim(), domain: normalizeDomain(c.domain) as string })),
+    runFrequency: state.runFrequency,
+  };
+}
+
+export interface SkipHandlers {
+  createBrand: () => Promise<string>;
+  onSuccess: (brandId: string) => void;
+  onDiscard: () => void;
+  onError: (message: string) => void;
+}
+
+/** Skip-onboarding decision. With a valid step-1 brand (name + domain) the
+ *  entered brand is created before leaving so it isn't lost; otherwise the
+ *  wizard is discarded. A create failure surfaces via onError and does NOT
+ *  navigate. */
+export async function runSkip(state: WizardState, handlers: SkipHandlers): Promise<void> {
+  if (!canProceed(1, state)) {
+    handlers.onDiscard();
+    return;
+  }
+  let brandId: string;
+  try {
+    brandId = await handlers.createBrand();
+  } catch (err) {
+    handlers.onError(err instanceof Error ? err.message : "Something went wrong");
+    return;
+  }
+  handlers.onSuccess(brandId);
+}

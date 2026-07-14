@@ -493,7 +493,8 @@ export function isBrandMentioned(
   responseText: string,
   domain: string | null,
   brandKeywords?: import("@/lib/engine/brand-detector").BrandKeywords,
+  categoryKeywords?: string[],
 ): boolean {
   if (!responseText || !domain) return false;
-  return detectMention(responseText, domain, brandKeywords).mentioned;
+  return detectMention(responseText, domain, brandKeywords, categoryKeywords).mentioned;
 }

@@ -1,12 +1,14 @@
 // Pure onboarding-wizard logic: default prompts, suggested-prompt merge, run
 // cost, and step-navigation gating. No server imports — unit-testable.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   brandFromDomain,
   buildDefaultPrompts,
+  buildBrandInput,
   mergeSuggestedPrompts,
   runCost,
   canProceed,
+  runSkip,
   initialWizardState,
   type WizardState,
 } from "@/lib/onboarding";
@@ -231,5 +233,99 @@ describe("canProceed", () => {
 
   it("step 5 (or unknown) never blocks navigation", () => {
     expect(canProceed(5, base())).toBe(true);
+  });
+});
+
+describe("buildBrandInput", () => {
+  const base = (): WizardState => initialWizardState();
+
+  it("normalizes the domain and trims the name", () => {
+    const s = { ...base(), brandName: "  Acme  ", domain: "https://www.Acme.com/about" };
+    const input = buildBrandInput(s);
+    expect(input.name).toBe("Acme");
+    expect(input.domain).toBe("acme.com");
+  });
+
+  it("carries competitors (name-trimmed, domain-normalized) and runFrequency", () => {
+    const s = {
+      ...base(),
+      brandName: "Acme",
+      domain: "acme.com",
+      runFrequency: "weekly" as const,
+      competitors: [{ name: "  Rival  ", domain: "https://Rival.com/" }],
+    };
+    const input = buildBrandInput(s);
+    expect(input.competitors).toEqual([{ name: "Rival", domain: "rival.com" }]);
+    expect(input.runFrequency).toBe("weekly");
+  });
+
+  it("drops incomplete competitor rows (missing name or invalid domain)", () => {
+    const s = {
+      ...base(),
+      brandName: "Acme",
+      domain: "acme.com",
+      competitors: [
+        { name: "", domain: "rival.com" },
+        { name: "Bogus", domain: "not a domain" },
+        { name: "Real", domain: "real.com" },
+      ],
+    };
+    expect(buildBrandInput(s).competitors).toEqual([{ name: "Real", domain: "real.com" }]);
+  });
+});
+
+describe("runSkip", () => {
+  const validState = (): WizardState => ({ ...initialWizardState(), brandName: "Acme", domain: "acme.com" });
+
+  it("with a valid step-1 brand, creates the brand then reports success (no discard, no error)", async () => {
+    const createBrand = vi.fn().mockResolvedValue("brand_123");
+    const onSuccess = vi.fn();
+    const onDiscard = vi.fn();
+    const onError = vi.fn();
+
+    await runSkip(validState(), { createBrand, onSuccess, onDiscard, onError });
+
+    expect(createBrand).toHaveBeenCalledTimes(1);
+    expect(onSuccess).toHaveBeenCalledWith("brand_123");
+    expect(onDiscard).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("with empty step-1 fields, discards without creating a brand", async () => {
+    const createBrand = vi.fn();
+    const onSuccess = vi.fn();
+    const onDiscard = vi.fn();
+    const onError = vi.fn();
+
+    await runSkip(initialWizardState(), { createBrand, onSuccess, onDiscard, onError });
+
+    expect(createBrand).not.toHaveBeenCalled();
+    expect(onDiscard).toHaveBeenCalledTimes(1);
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("blocks the create when only the domain is valid but the name is blank", async () => {
+    const createBrand = vi.fn();
+    const onDiscard = vi.fn();
+    await runSkip(
+      { ...initialWizardState(), brandName: "   ", domain: "acme.com" },
+      { createBrand, onSuccess: vi.fn(), onDiscard, onError: vi.fn() },
+    );
+    expect(createBrand).not.toHaveBeenCalled();
+    expect(onDiscard).toHaveBeenCalledTimes(1);
+  });
+
+  it("on create failure surfaces the error and does NOT navigate", async () => {
+    const createBrand = vi.fn().mockRejectedValue(new Error("Could not create brand"));
+    const onSuccess = vi.fn();
+    const onDiscard = vi.fn();
+    const onError = vi.fn();
+
+    await runSkip(validState(), { createBrand, onSuccess, onDiscard, onError });
+
+    expect(onError).toHaveBeenCalledWith("Could not create brand");
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onDiscard).not.toHaveBeenCalled();
   });
 });

@@ -15,6 +15,7 @@ import CompetitorEditor from "./CompetitorEditor";
 import GettingStarted from "./GettingStarted";
 import TrackedUrlsEditor from "./TrackedUrlsEditor";
 import { PLATFORM_LABEL, PLATFORM_ORDER } from "./platforms";
+import { MetricCard, Panel, SectionHeader } from "./ui-primitives";
 import { UI } from "@/app/ui";
 
 interface Brand {
@@ -114,6 +115,16 @@ interface ReplyRow {
   sentiment: string | null;
 }
 
+// Replies filter: All / Mentions-only / a specific sentiment. Digest-count
+// clicks reuse this by setting a sentiment mode.
+type ReplyFilterMode = "all" | "mentions" | "positive" | "neutral" | "negative";
+
+function matchesReplyFilter(row: ReplyRow, mode: ReplyFilterMode): boolean {
+  if (mode === "all") return true;
+  if (mode === "mentions") return row.brandMentioned;
+  return row.sentiment === mode;
+}
+
 interface HistoryRow {
   runId: string;
   period: string;
@@ -209,16 +220,6 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
     <svg width={w} height={h} role="img" aria-label="trend">
       <polyline points={pts} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
     </svg>
-  );
-}
-
-function MetricCard({ label, value, sub }: { label: string; value: string; sub?: React.ReactNode }) {
-  return (
-    <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px", flex: "1 1 150px" }}>
-      <div style={{ fontSize: 12, color: MUTED }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 700, margin: "4px 0" }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: FAINT }}>{sub}</div>}
-    </div>
   );
 }
 
@@ -361,7 +362,9 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
   const [topSources, setTopSources] = useState<Record<string, TopSource[]>>({});
   const [sourceChecks, setSourceChecks] = useState<Record<string, Record<string, CheckStatus>>>({});
   const [aiSearch, setAiSearch] = useState<AiSearchRow[] | null>(null);
-  const [replyFilter, setReplyFilter] = useState<{ runId: string; sentiment: "positive" | "neutral" | "negative" } | null>(null);
+  const [replyFilter, setReplyFilter] = useState<{ runId: string; mode: ReplyFilterMode } | null>(null);
+  // Empty = run all prompts (default). A non-empty subset scopes "Run now".
+  const [selectedPromptIds, setSelectedPromptIds] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     const [brandRes, promptsRes, runsRes, teamRes] = await Promise.all([
@@ -405,7 +408,11 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
     return () => clearInterval(t);
   }, [hasActiveRun, clientId, load]);
 
-  const runCost = prompts.length > 0 ? citationRunCredits(prompts.length, selectedPlatforms) : 0;
+  // Drop any selected ids that no longer exist (archived between selection and
+  // run) — an empty result means "run all", the default.
+  const selectedPromptCount = selectedPromptIds.filter((id) => prompts.some((p) => p.promptId === id)).length;
+  const runPromptCount = selectedPromptCount > 0 ? selectedPromptCount : prompts.length;
+  const runCost = prompts.length > 0 ? citationRunCredits(runPromptCount, selectedPlatforms) : 0;
   const singleCost = citationRunCredits(1, selectedPlatforms);
   // Scheduled runs always query all 4 models (Claude priced at 4) — unaffected by the picker.
   const scheduledCost = prompts.length > 0 ? citationRunCredits(prompts.length) : 0;
@@ -415,6 +422,10 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
     setSelectedPlatforms((cur) =>
       cur.includes(p) ? (cur.length > 1 ? cur.filter((x) => x !== p) : cur) : [...cur, p],
     );
+  }
+
+  function togglePromptSelection(id: string) {
+    setSelectedPromptIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
   }
 
   async function addPrompt(name: string, category: TrackerPromptCategory, text: string) {
@@ -518,7 +529,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
 
   /** Jump from a sentiment count to the matching replies of that run. */
   function showSentimentReplies(runId: string, sentiment: "positive" | "neutral" | "negative") {
-    setReplyFilter({ runId, sentiment });
+    setReplyFilter({ runId, mode: sentiment });
     setOpenRunId(runId);
     setTab("runs");
     if (!replies[runId]) void toggleReplies(runId);
@@ -572,12 +583,17 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
     <main style={{ maxWidth: 860, margin: "0 auto", padding: "40px 24px" }}>
       <Link href="/" style={{ color: FAINT, fontSize: 13, textDecoration: "none" }}>← Brands</Link>
 
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "12px 0 8px" }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 24 }}>{brand?.name ?? "…"}</h1>
+      <header style={{ display: "flex", flexDirection: "column", gap: 16, margin: "12px 0 8px" }}>
+        <div style={{ minWidth: 0 }}>
+          <h1
+            title={brand?.name ?? undefined}
+            style={{ margin: 0, fontSize: 24, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            {brand?.name ?? "…"}
+          </h1>
           {brand?.domain && <span style={{ color: FAINT, fontSize: 13 }}>{brand.domain}</span>}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
           <div style={{ display: "flex", gap: 4 }} title="Models the next manual run queries">
             {PLATFORM_ORDER.map((p) => {
               const on = selectedPlatforms.includes(p);
@@ -617,7 +633,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
             </select>
           </label>
           <button
-            onClick={() => void runNow()}
+            onClick={() => void runNow(selectedPromptCount > 0 ? selectedPromptIds.filter((id) => prompts.some((p) => p.promptId === id)) : undefined)}
             disabled={running || prompts.length === 0 || hasActiveRun}
             title={prompts.length === 0 ? "Add prompts first" : undefined}
             style={{ padding: "10px 18px", background: ACCENT, color: ON_ACCENT, border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", opacity: running || prompts.length === 0 || hasActiveRun ? 0.5 : 1 }}
@@ -626,6 +642,20 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
           </button>
         </div>
       </header>
+
+      {selectedPromptCount > 0 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, fontSize: 12, color: MUTED, marginBottom: 8 }}>
+          <span>
+            Run now targets <strong>{selectedPromptCount}</strong> of {prompts.length} prompt{prompts.length === 1 ? "" : "s"}
+          </span>
+          <button
+            onClick={() => setSelectedPromptIds([])}
+            style={{ background: "none", border: "none", padding: 0, color: ACCENT, cursor: "pointer", fontSize: 12, textDecoration: "underline" }}
+          >
+            clear selection
+          </button>
+        </div>
+      )}
 
       {balance !== null && balance < 0 && (
         <div style={{ background: UI.RED_BG, border: `1px solid ${UI.RED_BORDER}`, color: RED, borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 12 }}>
@@ -673,10 +703,22 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
               const latestReplies = replies[latestComplete.id];
               const latestSources = topSources[latestComplete.id];
               const sentimentCounts = latestReplies ? tallySentiment(finalAttempts(latestReplies)) : null;
+              // brandMentionRate is PROMPT-based (prompts naming the brand ÷
+              // prompts) — spell out the denominator so it can't be read as the
+              // digest's reply-based figure. rate × total is an exact integer.
+              const promptsTotal = m.promptsTotal;
+              const brandMentionPrompts = Math.round(m.brandMentionRate * promptsTotal);
+              const hasSources = !!(latestSources && latestSources.length > 0);
+              const hasAiSearch = aiSearch !== null && aiSearch.length > 0;
+              const hasPlatform = m.platformBreakdown?.length > 0;
+              const hasCompetitors = m.competitorMetrics?.length > 0;
               return (
-                <div style={{ display: "grid", gap: 12 }}>
-                  <div style={{ fontSize: 12, color: MUTED }}>
-                    Latest complete run · {latestComplete.period} · {latestComplete.promptsTotal ?? "?"} prompt{latestComplete.promptsTotal === 1 ? "" : "s"}
+                <div style={{ display: "grid", gap: 16 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                    <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Latest run</h2>
+                    <span style={{ fontSize: 12, color: FAINT }}>
+                      {latestComplete.period} · {promptsTotal ?? "?"} prompt{promptsTotal === 1 ? "" : "s"}
+                    </span>
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                     <MetricCard
@@ -684,14 +726,17 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                       value={stats?.brandCitationRate != null ? pct(stats.brandCitationRate) : "—"}
                       sub={brand?.domain ? `replies citing ${brand.domain}` : "set a domain to track this"}
                     />
-                    <MetricCard label="Brand mentions" value={pct(m.brandMentionRate)} sub="replies naming the brand" />
+                    <MetricCard
+                      label="Brand mentions"
+                      value={pct(m.brandMentionRate)}
+                      sub={`${brandMentionPrompts} of ${promptsTotal} prompt${promptsTotal === 1 ? "" : "s"}`}
+                    />
                     <MetricCard label="Share of AI voice" value={soav != null ? pct(soav) : "—"} sub="brand vs competitor citations" />
                     <MetricCard label="Citations" value={String(stats?.totalCitations ?? 0)} sub={stats?.hallucinatedCitations ? `verified sources · ${stats.hallucinatedCitations} hallucinated filtered out` : "verified sources"} />
                   </div>
 
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-                    <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px", flex: "1 1 220px" }}>
-                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Brand sentiment (latest run)</div>
+                    <Panel title="Brand sentiment (latest run)" style={{ flex: "1 1 220px" }}>
                       {sentimentCounts ? (
                         <div style={{ display: "flex", gap: 14, fontSize: 14, flexWrap: "wrap" }}>
                           <SentimentSplit counts={sentimentCounts} onSelect={(sent) => showSentimentReplies(latestComplete.id, sent)} />
@@ -702,115 +747,120 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                       ) : (
                         <span style={{ color: MUTED, fontSize: 12 }}>loading…</span>
                       )}
-                    </div>
-                    <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px", flex: "1 1 220px" }}>
-                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Brand-citation trend ({trend.length} runs)</div>
+                    </Panel>
+                    <Panel title={`Brand-citation trend (${trend.length} runs)`} style={{ flex: "1 1 220px" }}>
                       <Sparkline values={trend.map((r) => r.citationStats?.brandCitationRate ?? 0)} color={ACCENT} />
-                    </div>
+                    </Panel>
                   </div>
 
-                  {latestSources && latestSources.length > 0 && (
-                    <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
-                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Top cited pages (latest run)</div>
-                      <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
-                        {latestSources.filter((sSrc) => sSrc.check !== "dead" && sSrc.check !== "no_mention").map((sSrc) => (
-                          <div key={sSrc.page} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                            <span style={{ overflowWrap: "anywhere" }}>
-                              <a
-                                href={sSrc.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title={sSrc.url}
-                                style={{ fontWeight: sSrc.brand ? 700 : 400, color: ACCENT }}
-                              >
-                                {sSrc.page.length > 70 ? `${sSrc.page.slice(0, 70)}…` : sSrc.page}{sSrc.brand ? " · you" : ""}
-                              </a>
-                              {" "}<CheckBadge check={sSrc.check} />
-                            </span>
-                            <span style={{ color: FAINT, whiteSpace: "nowrap" }}>
-                              {sSrc.platforms.map((p) => PLATFORM_LABEL[p] ?? p).join(" + ")} · {sSrc.count}×
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {aiSearch !== null && aiSearch.length > 0 && (
-                    <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
-                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>
-                        AI Search — Google AI Overview (checked daily)
-                      </div>
-                      <div style={{ display: "grid", gap: 10, fontSize: 13 }}>
-                        {aiSearch.map((row) => (
-                          <div key={row.promptId}>
-                            <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                              <span style={{ overflowWrap: "anywhere" }}>{row.promptText}</span>
-                              <span style={{ whiteSpace: "nowrap", fontWeight: 600 }}>
-                                {!row.present ? (
-                                  <span style={{ color: MUTED }}>no AI Overview</span>
-                                ) : row.brandMentioned ? (
-                                  <>
-                                    <span style={{ color: GREEN }}>✓</span> <span style={{ color: BRAND_GREEN }}>brand in overview</span>
-                                  </>
-                                ) : (
-                                  <span style={{ color: RED }}>✗ brand absent</span>
-                                )}
-                              </span>
-                            </div>
-                            {row.present && row.citedUrls.length > 0 && (
-                              <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
-                                Overview cites:{" "}
-                                {row.citedUrls.slice(0, 6).map((c, i) => (
-                                  <span key={c.url}>
-                                    {i > 0 && " · "}
-                                    <a href={c.url} target="_blank" rel="noopener noreferrer" style={{ color: ACCENT }}>
-                                      {hostOf(c.url) ?? c.label}
-                                    </a>
-                                  </span>
-                                ))}
+                  {(hasSources || hasAiSearch) && (
+                    <>
+                      <SectionHeader>Where you&apos;re cited</SectionHeader>
+                      {hasSources && (
+                        <Panel title="Top cited pages (latest run)">
+                          <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
+                            {latestSources.filter((sSrc) => sSrc.check !== "dead" && sSrc.check !== "no_mention").map((sSrc) => (
+                              <div key={sSrc.page} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                                <span style={{ overflowWrap: "anywhere" }}>
+                                  <a
+                                    href={sSrc.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title={sSrc.url}
+                                    style={{ fontWeight: sSrc.brand ? 700 : 400, color: ACCENT }}
+                                  >
+                                    {sSrc.page.length > 70 ? `${sSrc.page.slice(0, 70)}…` : sSrc.page}{sSrc.brand ? " · you" : ""}
+                                  </a>
+                                  {" "}<CheckBadge check={sSrc.check} />
+                                </span>
+                                <span style={{ color: FAINT, whiteSpace: "nowrap" }}>
+                                  {sSrc.platforms.map((p) => PLATFORM_LABEL[p] ?? p).join(" + ")} · {sSrc.count}×
+                                </span>
                               </div>
-                            )}
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
+                        </Panel>
+                      )}
+
+                      {hasAiSearch && (
+                        <Panel title="AI Search — Google AI Overview (checked daily)">
+                          <div style={{ display: "grid", gap: 10, fontSize: 13 }}>
+                            {aiSearch.map((row) => (
+                              <div key={row.promptId}>
+                                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                                  <span style={{ overflowWrap: "anywhere" }}>{row.promptText}</span>
+                                  <span style={{ whiteSpace: "nowrap", fontWeight: 600 }}>
+                                    {!row.present ? (
+                                      <span style={{ color: MUTED }}>no AI Overview</span>
+                                    ) : row.brandMentioned ? (
+                                      <>
+                                        <span style={{ color: GREEN }}>✓</span> <span style={{ color: BRAND_GREEN }}>brand in overview</span>
+                                      </>
+                                    ) : (
+                                      <span style={{ color: RED }}>✗ brand absent</span>
+                                    )}
+                                  </span>
+                                </div>
+                                {row.present && row.citedUrls.length > 0 && (
+                                  <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
+                                    Overview cites:{" "}
+                                    {row.citedUrls.slice(0, 6).map((c, i) => (
+                                      <span key={c.url}>
+                                        {i > 0 && " · "}
+                                        <a href={c.url} target="_blank" rel="noopener noreferrer" style={{ color: ACCENT }}>
+                                          {hostOf(c.url) ?? c.label}
+                                        </a>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </Panel>
+                      )}
+                    </>
                   )}
 
-                  {m.platformBreakdown?.length > 0 && (
-                    <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
-                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>By platform (latest run)</div>
-                      <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
-                        <thead>
-                          <tr style={{ color: MUTED, textAlign: "left" }}>
-                            <th style={{ fontWeight: 400, paddingBottom: 6 }}>Platform</th>
-                            <th style={{ fontWeight: 400 }}>Brand mentions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {m.platformBreakdown.map((p) => (
-                            <tr key={p.platform} style={{ borderTop: BORDER }}>
-                              <td style={{ padding: "6px 0" }}>{PLATFORM_LABEL[p.platform] ?? p.platform}</td>
-                              <td><strong style={{ color: p.brandMentionRate > 0 ? BRAND_GREEN : FAINT }}>{pct(p.brandMentionRate)}</strong></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                  {(hasPlatform || hasCompetitors) && (
+                    <>
+                      <SectionHeader>Competitive landscape</SectionHeader>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
+                        {hasPlatform && (
+                          <Panel title="By platform (latest run)">
+                            <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+                              <thead>
+                                <tr style={{ color: MUTED, textAlign: "left" }}>
+                                  <th style={{ fontWeight: 400, paddingBottom: 6 }}>Platform</th>
+                                  <th style={{ fontWeight: 400 }}>Brand mentions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {m.platformBreakdown.map((p) => (
+                                  <tr key={p.platform} style={{ borderTop: BORDER }}>
+                                    <td style={{ padding: "6px 0" }}>{PLATFORM_LABEL[p.platform] ?? p.platform}</td>
+                                    <td><strong style={{ color: p.brandMentionRate > 0 ? BRAND_GREEN : FAINT }}>{pct(p.brandMentionRate)}</strong></td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </Panel>
+                        )}
 
-                  {m.competitorMetrics?.length > 0 && (
-                    <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
-                      <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>Competitors cited (latest run)</div>
-                      <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
-                        {m.competitorMetrics.map((c) => (
-                          <div key={c.domain} style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span>{c.name} <span style={{ color: MUTED }}>({c.domain})</span></span>
-                            <span><strong>{c.totalCitations}</strong> citations · {pct(c.citationRate)}</span>
-                          </div>
-                        ))}
+                        {hasCompetitors && (
+                          <Panel title="Competitors cited (latest run)">
+                            <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
+                              {m.competitorMetrics.map((c) => (
+                                <div key={c.domain} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                                  <span>{c.name} <span style={{ color: MUTED }}>({c.domain})</span></span>
+                                  <span style={{ whiteSpace: "nowrap" }}><strong>{c.totalCitations}</strong> citations · {pct(c.citationRate)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </Panel>
+                        )}
                       </div>
-                    </div>
+                    </>
                   )}
                 </div>
               );
@@ -887,9 +937,35 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
             </button>
           </form>
 
+          {prompts.length > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, fontSize: 12, color: MUTED }}>
+              <span>
+                {selectedPromptCount > 0
+                  ? `${selectedPromptCount} of ${prompts.length} selected — Run now targets just these`
+                  : "Tick prompts to run a subset — none ticked runs all"}
+              </span>
+              <button
+                onClick={() =>
+                  setSelectedPromptIds((cur) => (cur.length >= prompts.length ? [] : prompts.map((p) => p.promptId)))
+                }
+                style={{ background: "none", border: "none", padding: 0, color: ACCENT, cursor: "pointer", fontSize: 12, textDecoration: "underline" }}
+              >
+                {selectedPromptCount >= prompts.length ? "Clear all" : "Select all"}
+              </button>
+            </div>
+          )}
+
           <div style={{ display: "grid", gap: 8 }}>
             {prompts.map((p) => (
               <div key={p.promptId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: CARD, border: BORDER, borderRadius: 10, padding: "12px 16px" }}>
+                <input
+                  type="checkbox"
+                  checked={selectedPromptIds.includes(p.promptId)}
+                  onChange={() => togglePromptSelection(p.promptId)}
+                  aria-label={`Select prompt for the next run: ${p.text}`}
+                  title="Include this prompt in the next Run now"
+                  style={{ marginRight: 12, cursor: "pointer", accentColor: ACCENT }}
+                />
                 <div style={{ flex: 1, marginRight: 12 }}>
                   <div style={{ fontSize: 14 }}>{p.text}</div>
                   <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
@@ -954,28 +1030,50 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
               No reports yet — run your first report to see where AI mentions your brand and which sources it cites.
             </p>
           )}
-          {runs.map((r) => (
-            <div key={r.id} style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 18px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <div style={{ fontSize: 14 }}>
-                  <strong>{r.period}</strong>
-                  <span style={{ color: MUTED, marginLeft: 8, fontSize: 12 }}>
-                    {r.kind} · {r.promptsTotal ?? "?"} prompt{r.promptsTotal === 1 ? "" : "s"}
+          {runs.map((r) => {
+            // Status pill: semantic colour + matching soft background (all
+            // existing tokens). Title row = period + status; a lighter second
+            // line carries the run's metadata so nothing is one muted run-on.
+            const statusStyle =
+              r.status === "complete"
+                ? { color: GREEN, background: UI.GREEN_BG }
+                : r.status === "failed"
+                  ? { color: RED, background: UI.RED_BG }
+                  : { color: ACCENT, background: UI.COPPER_BG };
+            const runMentionPrompts = r.metrics ? Math.round(r.metrics.brandMentionRate * r.metrics.promptsTotal) : 0;
+            const runPrompts = r.metrics?.promptsTotal ?? r.promptsTotal ?? 0;
+            return (
+            <div key={r.id} style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "16px 18px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>{r.period}</div>
+                  <div style={{ color: FAINT, fontSize: 12, marginTop: 3 }}>
+                    {r.kind === "manual" ? "Manual run" : "Scheduled run"} · {r.promptsTotal ?? "?"} prompt{r.promptsTotal === 1 ? "" : "s"}
                     {r.scope?.platforms?.length
                       ? ` · ${r.scope.platforms.map((p) => PLATFORM_LABEL[p] ?? p).join(" + ")}`
                       : ""}
-                  </span>
+                  </div>
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: r.status === "complete" ? GREEN : r.status === "failed" ? RED : ACCENT }}>
+                <span style={{ fontSize: 11, fontWeight: 600, textTransform: "capitalize", padding: "3px 10px", borderRadius: 999, border: BORDER, ...statusStyle }}>
                   {r.status}
                 </span>
               </div>
               {r.metrics && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 24, marginTop: 10, fontSize: 13 }}>
-                  <span>Brand cited <strong>{r.citationStats?.brandCitationRate != null ? pct(r.citationStats.brandCitationRate) : "—"}</strong></span>
-                  <span>Brand mentions <strong>{pct(r.metrics.brandMentionRate)}</strong></span>
-                  <span>Brand citations <strong>{r.citationStats?.brandCitations ?? 0}</strong></span>
-                  <span>All citations <strong>{r.citationStats?.totalCitations ?? 0}</strong></span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
+                  <MetricCard
+                    label="Brand cited"
+                    value={r.citationStats?.brandCitationRate != null ? pct(r.citationStats.brandCitationRate) : "—"}
+                    sub="of replies"
+                    inset
+                  />
+                  <MetricCard
+                    label="Brand mentions"
+                    value={pct(r.metrics.brandMentionRate)}
+                    sub={`${runMentionPrompts} of ${runPrompts} prompt${runPrompts === 1 ? "" : "s"}`}
+                    inset
+                  />
+                  <MetricCard label="Brand citations" value={String(r.citationStats?.brandCitations ?? 0)} sub="sources" inset />
+                  <MetricCard label="All citations" value={String(r.citationStats?.totalCitations ?? 0)} sub="sources" inset />
                 </div>
               )}
               {r.error && <div style={{ marginTop: 8, fontSize: 12, color: RED }}>{r.error}</div>}
@@ -987,41 +1085,82 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                   {openRunId === r.id ? "Hide replies" : "View replies"}
                 </button>
               )}
-              {openRunId === r.id && replies[r.id] && (
-                <div style={{ marginTop: 10, display: "grid", gap: 12 }}>
-                  <RunDigest rows={replies[r.id]} onSelectSentiment={(sent) => setReplyFilter({ runId: r.id, sentiment: sent })} />
-                  {replyFilter?.runId === r.id && (
-                    <div style={{ fontSize: 12, color: SENTIMENT_STYLE[replyFilter.sentiment].color }}>
-                      Showing {replyFilter.sentiment} replies only{" "}
-                      <button onClick={() => setReplyFilter(null)} style={{ background: "none", border: "none", padding: 0, color: ACCENT, cursor: "pointer", fontSize: 12, textDecoration: "underline" }}>
-                        show all
-                      </button>
+              {openRunId === r.id && replies[r.id] && (() => {
+                const rows = replies[r.id];
+                const activeMode: ReplyFilterMode = replyFilter?.runId === r.id ? replyFilter.mode : "all";
+                const mentionsCount = rows.filter((x) => x.brandMentioned).length;
+                const sentimentsPresent = (["positive", "neutral", "negative"] as const).filter((s) =>
+                  rows.some((x) => x.sentiment === s),
+                );
+                const options: { mode: ReplyFilterMode; label: string }[] = [
+                  { mode: "all", label: "All" },
+                  { mode: "mentions", label: `Mentions (${mentionsCount})` },
+                  ...sentimentsPresent.map((s) => ({ mode: s as ReplyFilterMode, label: SENTIMENT_STYLE[s].label })),
+                ];
+                const filtered = [...rows]
+                  .filter((row) => matchesReplyFilter(row, activeMode))
+                  .sort((a, b) =>
+                    a.promptText === b.promptText
+                      ? PLATFORM_ORDER.indexOf(a.platform as TrackerPlatform) - PLATFORM_ORDER.indexOf(b.platform as TrackerPlatform)
+                      : 0,
+                  );
+                const emptyLabel = activeMode === "all" ? "" : activeMode === "mentions" ? "brand-mention " : `${activeMode} `;
+                return (
+                  <div style={{ marginTop: 10, display: "grid", gap: 12 }}>
+                    <RunDigest rows={rows} onSelectSentiment={(sent) => setReplyFilter({ runId: r.id, mode: sent })} />
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {options.map((o) => {
+                        const on = activeMode === o.mode;
+                        return (
+                          <button
+                            key={o.mode}
+                            onClick={() => setReplyFilter(o.mode === "all" ? null : { runId: r.id, mode: o.mode })}
+                            style={{
+                              padding: "4px 10px",
+                              background: on ? ACCENT : CARD,
+                              border: on ? `1px solid ${ACCENT}` : BORDER,
+                              borderRadius: 999,
+                              fontSize: 12,
+                              cursor: "pointer",
+                              color: on ? ON_ACCENT : MUTED,
+                              fontWeight: on ? 600 : 400,
+                            }}
+                          >
+                            {o.label}
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
-                  {[...replies[r.id]]
-                    .filter((row) => replyFilter?.runId !== r.id || row.sentiment === replyFilter.sentiment)
-                    .sort((a, b) =>
-                      a.promptText === b.promptText
-                        ? PLATFORM_ORDER.indexOf(a.platform as TrackerPlatform) - PLATFORM_ORDER.indexOf(b.platform as TrackerPlatform)
-                        : 0,
-                    )
-                    .map((resp, i, sorted) => (
-                    <div key={i}>
-                      {(i === 0 || sorted[i - 1].promptText !== resp.promptText) && (
-                        <div style={{ fontSize: 13, fontWeight: 600, margin: "6px 0" }}>{resp.promptText}</div>
-                      )}
-                      <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>
-                        {PLATFORM_LABEL[resp.platform] ?? resp.platform}
-                        {resp.model ? ` · ${resp.model}` : ""}
-                        {resp.attempt > 1 ? ` · attempt ${resp.attempt}` : ""}
-                      </div>
-                      <ReplyText text={resp.responseText} mentioned={resp.brandMentioned} sentiment={resp.sentiment} citedUrls={resp.citedUrls} checks={sourceChecks[r.id]} />
-                    </div>
-                  ))}
-                </div>
-              )}
+                    {filtered.length === 0 ? (
+                      <div style={{ fontSize: 12, color: FAINT }}>No {emptyLabel}replies in this run.</div>
+                    ) : (
+                      filtered.map((resp, i, sorted) => {
+                        // A prompt heading opens each group and is clearly set
+                        // off (heavier top margin + a hairline) from the group
+                        // above; the platform/model/attempt line is quieter
+                        // (Steel) secondary metadata above the reply body.
+                        const newGroup = i === 0 || sorted[i - 1].promptText !== resp.promptText;
+                        return (
+                          <div key={i} style={newGroup && i > 0 ? { marginTop: 8, borderTop: BORDER, paddingTop: 14 } : undefined}>
+                            {newGroup && (
+                              <div style={{ fontSize: 14, fontWeight: 600, margin: "0 0 8px", color: UI.TEXT }}>{resp.promptText}</div>
+                            )}
+                            <div style={{ fontSize: 11, color: FAINT, marginBottom: 4 }}>
+                              {PLATFORM_LABEL[resp.platform] ?? resp.platform}
+                              {resp.model ? ` · ${resp.model}` : ""}
+                              {resp.attempt > 1 ? ` · attempt ${resp.attempt}` : ""}
+                            </div>
+                            <ReplyText text={resp.responseText} mentioned={resp.brandMentioned} sentiment={resp.sentiment} citedUrls={resp.citedUrls} checks={sourceChecks[r.id]} />
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                );
+              })()}
             </div>
-          ))}
+            );
+          })}
         </section>
       )}
     </main>

@@ -11,9 +11,11 @@ import { apiUrl } from "@/lib/api-url";
 import { normalizeDomain } from "@/lib/domain";
 import {
   buildDefaultPrompts,
+  buildBrandInput,
   mergeSuggestedPrompts,
   runCost,
   canProceed,
+  runSkip,
   clampStep,
   initialWizardState,
   BUY_CREDITS_FALLBACK,
@@ -37,6 +39,16 @@ const ACCENT = UI.COPPER;
 const ON_ACCENT = UI.ON_ACCENT;
 
 type CommitStage = "" | "brand" | "prompts" | "tracked-urls" | "run" | "done";
+
+// Home auto-redirects brand-less teams back here; flag the skip so that guard
+// lets us out to the brand list instead of bouncing us straight back in.
+function flagSkipped() {
+  try {
+    sessionStorage.setItem("cite-onboarding-skipped", "1");
+  } catch {
+    /* ignore — SSR / storage disabled */
+  }
+}
 
 export default function OnboardingWizard() {
   const router = useRouter();
@@ -62,6 +74,10 @@ export default function OnboardingWizard() {
   // Suggest-in-flight (step 2) — the Continue button waits on it so late
   // suggestions still reach the step-3 prompt list instead of being discarded.
   const [suggestLoading, setSuggestLoading] = useState(false);
+
+  // Skip-in-flight — disables the Skip button while its brand create is pending
+  // so a double-click can't create the brand twice.
+  const [skipping, setSkipping] = useState(false);
 
   // Balance at mount for the credit meter.
   useEffect(() => {
@@ -96,6 +112,18 @@ export default function OnboardingWizard() {
   const cost = runCost(selectedPrompts.length).credits;
   const canAdvance = canProceed(state.step, state);
 
+  // The single brand-creation path — POST /api/brands from the current wizard
+  // state, returning the new brand id. Shared by the launch commit and Skip.
+  const createBrand = useCallback(async (): Promise<string> => {
+    const res = await fetch(apiUrl("/api/brands"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildBrandInput(state)),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Could not create brand");
+    return (await res.json()).brand.id as string;
+  }, [state]);
+
   // ── Commit sequence — idempotent, resumes from the failed stage ─────────────
   const commit = useCallback(async () => {
     setCommitError(null);
@@ -104,22 +132,7 @@ export default function OnboardingWizard() {
       let clientId = brandId;
       if (!clientId) {
         setCommitStage("brand");
-        const cleanDomain = normalizeDomain(state.domain);
-        const competitors = state.competitors
-          .filter((c) => c.name.trim() && normalizeDomain(c.domain))
-          .map((c) => ({ name: c.name.trim(), domain: normalizeDomain(c.domain) as string }));
-        const res = await fetch(apiUrl("/api/brands"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: state.brandName.trim(),
-            domain: cleanDomain,
-            competitors,
-            runFrequency: state.runFrequency,
-          }),
-        });
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Could not create brand");
-        clientId = (await res.json()).brand.id as string;
+        clientId = await createBrand();
         setBrandId(clientId);
         // Brand now exists — the auto-redirect's "escape the empty state" guard
         // has served its purpose, so drop the skip flag (see app/page.tsx).
@@ -187,7 +200,32 @@ export default function OnboardingWizard() {
       setCommitError(message);
       toast.error(message);
     }
-  }, [brandId, committedUrls, selectedPrompts, state]);
+  }, [brandId, committedUrls, selectedPrompts, state, createBrand]);
+
+  // Skip onboarding — but don't discard a brand the user already entered. With a
+  // valid step-1 brand, create it first and land on its page; otherwise leave to
+  // the (empty) brand list. A create failure surfaces the error and stays put.
+  const handleSkip = useCallback(() => {
+    if (skipping) return;
+    setSkipping(true);
+    setCommitError(null);
+    void runSkip(state, {
+      createBrand,
+      onSuccess: (id) => {
+        flagSkipped();
+        router.push(`/brands/${id}`);
+      },
+      onDiscard: () => {
+        flagSkipped();
+        router.push("/");
+      },
+      onError: (message) => {
+        setCommitError(message);
+        toast.error(message);
+        setSkipping(false);
+      },
+    });
+  }, [skipping, state, createBrand, router]);
 
   return (
     <main style={{ maxWidth: 860, margin: "0 auto", padding: "40px 24px" }}>
@@ -292,23 +330,21 @@ export default function OnboardingWizard() {
         </div>
       )}
 
-      <p style={{ textAlign: "center", marginTop: 24 }}>
-        <button
-          onClick={() => {
-            // Home auto-redirects brand-less teams back here; flag the skip so
-            // that guard lets us out to the (empty) brand list instead.
-            try {
-              sessionStorage.setItem("cite-onboarding-skipped", "1");
-            } catch {
-              /* ignore — SSR / storage disabled */
-            }
-            router.push("/");
-          }}
-          style={{ background: "transparent", border: "none", color: MUTED, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}
-        >
-          Skip onboarding
-        </button>
-      </p>
+      {/* Skip is only offered before the launch commit begins. Once commit()
+          has created a brand (brandId) or entered any stage, Skip must not fire
+          a second createBrand — that would duplicate the brand and abandon the
+          run the user just launched. */}
+      {brandId === null && commitStage === "" && (
+        <p style={{ textAlign: "center", marginTop: 24 }}>
+          <button
+            onClick={handleSkip}
+            disabled={skipping}
+            style={{ background: "transparent", border: "none", color: MUTED, fontSize: 13, cursor: skipping ? "default" : "pointer", textDecoration: "underline", opacity: skipping ? 0.5 : 1 }}
+          >
+            {skipping ? "Saving your brand…" : "Skip onboarding"}
+          </button>
+        </p>
+      )}
     </main>
   );
 }
