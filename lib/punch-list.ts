@@ -29,7 +29,10 @@ export interface QuoteItem {
   platform: string;
   platformLabel: string;
   sentiment: string | null;
+  /** Word-boundary preview (≤200 chars). */
   quote: string;
+  /** Full sentence(s) — equal to `quote` when nothing was trimmed. */
+  quoteFull: string;
 }
 
 export interface GapItem {
@@ -91,20 +94,25 @@ function topCitedDomains(
 }
 
 /**
- * Extract the sentence(s) that name the brand, trimmed to ≤200 chars. Returns
- * null when the brand string never appears in the text (defensive — a stored
- * brandMentioned flag can outrun the actual text).
+ * Extract the sentence(s) that name the brand. Returns the full sentence(s) plus
+ * a ≤200-char preview cut on a word boundary (never mid-word). Null when the
+ * brand string never appears in the text (defensive — a stored brandMentioned
+ * flag can outrun the actual text).
  */
-function brandSentence(text: string | null, brandName: string): string | null {
+function brandSentence(text: string | null, brandName: string): { quote: string; quoteFull: string } | null {
   if (!text) return null;
   const needle = brandName.trim().toLowerCase();
   if (!needle || !text.toLowerCase().includes(needle)) return null;
   // Split into sentences, keep those containing the brand.
   const sentences = text.split(/(?<=[.!?])\s+/);
   const hits = sentences.filter((s) => s.toLowerCase().includes(needle)).map((s) => s.trim());
-  const joined = (hits.length ? hits.join(" ") : text).trim();
-  if (joined.length <= QUOTE_MAX_CHARS) return joined;
-  return `${joined.slice(0, QUOTE_MAX_CHARS - 1).trimEnd()}…`;
+  const full = (hits.length ? hits.join(" ") : text).trim();
+  if (full.length <= QUOTE_MAX_CHARS) return { quote: full, quoteFull: full };
+  // Break on the last whitespace within the limit so the preview never ends mid-word.
+  const slice = full.slice(0, QUOTE_MAX_CHARS - 1);
+  const lastSpace = slice.lastIndexOf(" ");
+  const cut = (lastSpace > 0 ? slice.slice(0, lastSpace) : slice).trimEnd();
+  return { quote: `${cut}…`, quoteFull: full };
 }
 
 export function buildPunchList(
@@ -139,7 +147,8 @@ export function buildPunchList(
       platform: r.platform,
       platformLabel: PLATFORM_LABEL[r.platform] ?? r.platform,
       sentiment: r.sentiment,
-      quote,
+      quote: quote.quote,
+      quoteFull: quote.quoteFull,
     });
   }
 

@@ -5,7 +5,7 @@
 // CTA so the user leaves onboarding with concrete next actions.
 import { useEffect, useState } from "react";
 import { apiUrl } from "@/lib/api-url";
-import { buildPunchList, type PunchResponse, type PunchList as PunchListData } from "@/lib/punch-list";
+import { buildPunchList, type PunchResponse, type PunchList as PunchListData, type QuoteItem } from "@/lib/punch-list";
 import { UI } from "@/app/ui";
 
 const CARD = UI.CARD;
@@ -13,11 +13,36 @@ const BORDER = UI.BORDER_CSS;
 const MUTED = UI.T2;
 const GREEN = UI.GREEN;
 const RED = UI.RED;
+const ACCENT = UI.COPPER;
 
 function sentimentColor(sentiment: string | null): string {
   if (sentiment === "positive") return GREEN;
   if (sentiment === "negative") return RED;
   return MUTED;
+}
+
+/** A verbatim quote card with an in-place Show more toggle when the preview was trimmed. */
+function QuoteCard({ item }: { item: QuoteItem }) {
+  const [expanded, setExpanded] = useState(false);
+  const color = sentimentColor(item.sentiment);
+  const truncated = item.quoteFull.length > item.quote.length;
+  return (
+    <div style={{ borderLeft: `3px solid ${color}`, background: UI.REPLY_BG, borderRadius: 6, padding: "8px 12px" }}>
+      <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>
+        {item.platformLabel}
+        {item.sentiment ? <span style={{ color, fontWeight: 600 }}> · {item.sentiment}</span> : null}
+      </div>
+      <div style={{ fontSize: 13, lineHeight: 1.5 }}>“{expanded ? item.quoteFull : item.quote}”</div>
+      {truncated && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          style={{ marginTop: 4, background: "none", border: "none", padding: 0, color: ACCENT, fontSize: 11, cursor: "pointer" }}
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function PunchList({
@@ -79,16 +104,7 @@ export default function PunchList({
             );
           }
           if (item.kind === "quote") {
-            const color = sentimentColor(item.sentiment);
-            return (
-              <div key={i} style={{ borderLeft: `3px solid ${color}`, background: UI.REPLY_BG, borderRadius: 6, padding: "8px 12px" }}>
-                <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>
-                  {item.platformLabel}
-                  {item.sentiment ? <span style={{ color, fontWeight: 600 }}> · {item.sentiment}</span> : null}
-                </div>
-                <div style={{ fontSize: 13, lineHeight: 1.5 }}>“{item.quote}”</div>
-              </div>
-            );
+            return <QuoteCard key={i} item={item} />;
           }
           if (item.kind === "gap") {
             return (
