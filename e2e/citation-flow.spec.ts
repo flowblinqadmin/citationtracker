@@ -102,7 +102,7 @@ test("competitor editor: saved competitors persist and SoAV lights up retroactiv
   await page.getByRole("link", { name: new RegExp(brandName) }).click();
 
   // Without competitors the brand wins every citation it has: 8/(8+0) = 100%.
-  const soavCard = page.getByText("Share of AI voice", { exact: true }).locator("..");
+  const soavCard = page.getByText("Tracked-prompt share", { exact: false }).locator("..");
   await expect(soavCard.getByText("100%")).toBeVisible();
 
   await page.getByRole("button", { name: "+ Add competitor" }).click();
@@ -117,7 +117,7 @@ test("competitor editor: saved competitors persist and SoAV lights up retroactiv
   // 15s like the run test: a full document reload can hit the dev server's
   // on-demand recompile (slow on symlinked-node_modules worktrees).
   await expect(page.getByPlaceholder("Domain (e.g. apollo.com)")).toHaveValue("thirdparty.example", { timeout: 15_000 });
-  const soavAfter = page.getByText("Share of AI voice", { exact: true }).locator("..");
+  const soavAfter = page.getByText("Tracked-prompt share", { exact: false }).locator("..");
   await expect(soavAfter.getByText("50%")).toBeVisible();
 });
 

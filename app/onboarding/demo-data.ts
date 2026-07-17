@@ -4,7 +4,7 @@
 export const DEMO_BRAND = "Meridian Coffee";
 export const DEMO_DOMAIN = "meridiancoffee.com";
 
-/** Share of AI voice: brand vs its competitors (fractions sum ≈ 1). */
+/** Tracked-prompt share: brand vs its named competitors (fractions sum ≈ 1). */
 export interface DemoVoiceRow {
   name: string;
   domain: string;

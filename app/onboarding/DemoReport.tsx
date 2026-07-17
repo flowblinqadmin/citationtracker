@@ -24,10 +24,13 @@ const GREEN = UI.GREEN;
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-function Metric({ label, value, sub }: { label: string; value: string; sub: string }) {
+function Metric({ label, value, sub, info }: { label: string; value: string; sub: string; info?: string }) {
   return (
     <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px", flex: "1 1 150px" }}>
-      <div style={{ fontSize: 12, color: MUTED }}>{label}</div>
+      <div style={{ fontSize: 12, color: MUTED }}>
+        {label}
+        {info && <span title={info} role="img" aria-label={info} style={{ marginLeft: 4, cursor: "help" }}>ⓘ</span>}
+      </div>
       <div style={{ fontSize: 24, fontWeight: 700, margin: "4px 0" }}>{value}</div>
       <div style={{ fontSize: 12, color: MUTED }}>{sub}</div>
     </div>
@@ -67,13 +70,16 @@ export default function DemoReport() {
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
           <Metric label="Brand mentions" value={pct(DEMO_BRAND_MENTION_RATE)} sub="replies naming the brand" />
-          <Metric label="Share of AI voice" value={pct(DEMO_SOAV)} sub="brand vs competitor citations" />
+          <Metric label="Tracked-prompt share" value={pct(DEMO_SOAV)} sub="brand vs named-competitor citations" info="Share of voice measured only across the prompts you track and the competitors you named — not the whole category." />
           <Metric label="Citations" value={String(DEMO_TOTAL_CITATIONS)} sub="verified sources" />
         </div>
 
-        {/* Share of AI voice — bar list */}
+        {/* Tracked-prompt share — bar list */}
         <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "14px 16px" }}>
-          <div style={{ fontSize: 12, color: MUTED, marginBottom: 10 }}>Share of AI voice</div>
+          <div style={{ fontSize: 12, color: MUTED, marginBottom: 10 }}>
+            Tracked-prompt share
+            <span title="Share of voice measured only across the prompts you track and the competitors you named — not the whole category." role="img" aria-label="Share of voice measured only across the prompts you track and the competitors you named — not the whole category." style={{ marginLeft: 4, cursor: "help" }}>ⓘ</span>
+          </div>
           <div style={{ display: "grid", gap: 8 }}>
             {DEMO_VOICE.map((v) => (
               <div key={v.name} style={{ display: "grid", gridTemplateColumns: "160px 1fr 44px", gap: 10, alignItems: "center", fontSize: 13 }}>

@@ -1,7 +1,7 @@
 "use client";
 
 // Brand list — the app home. Create brands, see credit balance, drill in.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -73,9 +73,13 @@ function BinButton({ onClick }: { onClick: () => void }) {
 export default function BrandListPage() {
   const router = useRouter();
   const [brands, setBrands] = useState<Brand[] | null>(null);
-  // Inline two-step delete, per row: id being confirmed / id in flight.
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Delete flow: a modal confirms intent, then the row is optimistically hidden
+  // for a 7s Undo window before the API call actually fires. `confirming` holds
+  // the brand awaiting modal confirmation; `deferredIds` are hidden-pending-delete
+  // rows; timers fire the real DELETE (or are cancelled by Undo).
+  const [confirming, setConfirming] = useState<Brand | null>(null);
+  const [deferredIds, setDeferredIds] = useState<string[]>([]);
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const load = useCallback(async () => {
     const brandsRes = await fetch(apiUrl("/api/brands"));
@@ -102,25 +106,71 @@ export default function BrandListPage() {
     if (!skipped) router.replace("/onboarding");
   }, [brands, router]);
 
-  async function deleteBrand(id: string) {
-    setDeletingId(id);
+  // Fire the real DELETE once the Undo window elapses. On failure, the hidden
+  // row is restored so nothing silently vanishes.
+  const commitDelete = useCallback(async (id: string) => {
+    delete timers.current[id];
     try {
       const res = await fetch(apiUrl(`/api/brands/${id}`), { method: "DELETE" });
       if (!res.ok) {
         toast.error((await res.json().catch(() => ({}))).error ?? "Could not delete this brand");
-        setDeletingId(null);
+        setDeferredIds((cur) => cur.filter((x) => x !== id)); // un-hide
         return;
       }
-      toast.success("Brand deleted");
-      // Drop from local state — no full reload needed.
       setBrands((cur) => (cur ? cur.filter((b) => b.id !== id) : cur));
-      setConfirmingId(null);
-      setDeletingId(null);
+      setDeferredIds((cur) => cur.filter((x) => x !== id));
     } catch {
       toast.error("Could not delete this brand");
-      setDeletingId(null);
+      setDeferredIds((cur) => cur.filter((x) => x !== id));
     }
+  }, []);
+
+  // Confirmed in the modal → hide the row, open a 7s Undo toast, then commit.
+  function startDeferredDelete(brand: Brand) {
+    setConfirming(null);
+    setDeferredIds((cur) => (cur.includes(brand.id) ? cur : [...cur, brand.id]));
+    timers.current[brand.id] = setTimeout(() => void commitDelete(brand.id), 7000);
+    toast(`Deleted ${brand.name}`, {
+      duration: 7000,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          const t = timers.current[brand.id];
+          if (t) {
+            clearTimeout(t);
+            delete timers.current[brand.id];
+          }
+          setDeferredIds((cur) => cur.filter((x) => x !== brand.id)); // row reappears in place
+        },
+      },
+    });
   }
+
+  // On unmount (navigation away), flush any still-pending deletes — the user
+  // already confirmed them, so commit rather than lose the intent, and clear
+  // timers so nothing fires against an unmounted component.
+  useEffect(() => {
+    const pending = timers.current;
+    return () => {
+      for (const [id, t] of Object.entries(pending)) {
+        clearTimeout(t);
+        void fetch(apiUrl(`/api/brands/${id}`), { method: "DELETE" });
+      }
+    };
+  }, []);
+
+  // Escape closes the confirmation modal (blur-to-cancel safety).
+  useEffect(() => {
+    if (!confirming) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setConfirming(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [confirming]);
+
+  // Rows hidden during their Undo window are dropped from the visible list.
+  const visibleBrands = (brands ?? []).filter((b) => !deferredIds.includes(b.id));
 
   return (
     <main style={{ maxWidth: 860, margin: "0 auto", padding: "40px 24px" }}>
@@ -142,58 +192,64 @@ export default function BrandListPage() {
 
       {brands === null ? (
         <p style={{ color: MUTED }}>Loading…</p>
-      ) : brands.length === 0 ? (
+      ) : visibleBrands.length === 0 ? (
         <div style={{ background: CARD, border: BORDER, borderRadius: 12, padding: 32, textAlign: "center", color: MUTED }}>
           No brands yet. Add one above, pick prompts from the library, and run your first citation check.
         </div>
       ) : (
         <div style={{ display: "grid", gap: 10 }}>
-          {brands.map((b) => {
-            const confirming = confirmingId === b.id;
-            const deleting = deletingId === b.id;
-            return (
-              <div
-                key={b.id}
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: CARD, border: BORDER, borderRadius: 12, padding: "16px 20px", color: UI.TEXT }}
+          {visibleBrands.map((b) => (
+            <div
+              key={b.id}
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: CARD, border: BORDER, borderRadius: 12, padding: "16px 20px", color: UI.TEXT }}
+            >
+              <Link
+                href={`/brands/${b.id}`}
+                style={{ minWidth: 0, textDecoration: "none", color: UI.TEXT }}
               >
-                <Link
-                  href={`/brands/${b.id}`}
-                  style={{ minWidth: 0, textDecoration: "none", color: UI.TEXT }}
-                >
-                  <strong>{b.name}</strong>
-                  {b.domain && <span style={{ color: MUTED, marginLeft: 10, fontSize: 13 }}>{b.domain}</span>}
+                <strong>{b.name}</strong>
+                {b.domain && <span style={{ color: MUTED, marginLeft: 10, fontSize: 13 }}>{b.domain}</span>}
+              </Link>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <Link href={`/brands/${b.id}`} style={SECONDARY_BTN}>
+                  Details
                 </Link>
-                {confirming ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                    <span style={{ fontSize: 13, color: MUTED }}>Delete {b.name}?</span>
-                    <button
-                      type="button"
-                      onClick={() => void deleteBrand(b.id)}
-                      disabled={deleting}
-                      style={{ padding: "6px 14px", background: RED, color: ON_ACCENT, border: `1px solid ${UI.RED_BORDER}`, borderRadius: 8, fontSize: 13, cursor: deleting ? "default" : "pointer", opacity: deleting ? 0.6 : 1 }}
-                    >
-                      {deleting ? "Deleting…" : "Delete"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmingId(null)}
-                      disabled={deleting}
-                      style={{ ...SECONDARY_BTN, cursor: deleting ? "default" : "pointer", opacity: deleting ? 0.6 : 1 }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                    <Link href={`/brands/${b.id}`} style={SECONDARY_BTN}>
-                      Details
-                    </Link>
-                    <BinButton onClick={() => setConfirmingId(b.id)} />
-                  </div>
-                )}
+                <BinButton onClick={() => setConfirming(b)} />
               </div>
-            );
-          })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {confirming && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Delete ${confirming.name}`}
+          onClick={() => setConfirming(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, zIndex: 50 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: CARD, border: BORDER, borderRadius: 12, padding: 24, maxWidth: 420, width: "100%", color: UI.TEXT }}
+          >
+            <h2 style={{ margin: 0, fontSize: 18 }}>Delete {confirming.name}?</h2>
+            <p style={{ margin: "8px 0 20px", color: MUTED, fontSize: 14, lineHeight: 1.5 }}>
+              This removes the brand and all its prompts and citation checks. You&apos;ll have a few seconds to undo.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button type="button" onClick={() => setConfirming(null)} style={SECONDARY_BTN}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => startDeferredDelete(confirming)}
+                style={{ padding: "6px 14px", background: RED, color: ON_ACCENT, border: `1px solid ${UI.RED_BORDER}`, borderRadius: 8, fontSize: 13, cursor: "pointer" }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </main>

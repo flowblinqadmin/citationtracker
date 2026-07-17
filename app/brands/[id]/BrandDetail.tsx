@@ -42,7 +42,6 @@ interface Run {
   promptsTotal: number | null;
   createdAt: string;
   completedAt: string | null;
-  error: string | null;
   metrics: TrackerRunMetrics | null;
   scope: { promptVersionIds?: string[]; platforms?: string[] } | null;
   // Brand-domain stats computed by this service (geo's metrics match a PCG
@@ -102,6 +101,16 @@ const RED = UI.RED;
 const ORANGE = UI.ORANGE;
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
+
+/** Full local date + time for a run, e.g. "Jul 13, 2026, 2:41 PM". */
+const formatRunDate = (iso: string) =>
+  new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 
 interface ReplyRow {
   promptName: string;
@@ -266,8 +275,9 @@ const MD_COMPONENTS: Components = {
 /** Slice markdown without leaving unclosed syntax to render literally. */
 function previewSlice(text: string): string {
   let cut = text.slice(0, REPLY_PREVIEW_CHARS);
+  // Always break on the last whitespace so we never cut mid-word.
   const lastSpace = cut.lastIndexOf(" ");
-  if (lastSpace > REPLY_PREVIEW_CHARS - 40) cut = cut.slice(0, lastSpace);
+  if (lastSpace > 0) cut = cut.slice(0, lastSpace);
   cut = cut.trimEnd();
   // Drop an incomplete trailing [link](fragment
   const lastOpen = cut.lastIndexOf("[");
@@ -562,7 +572,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
       if (body.alreadyRunning) {
         toast.info("A run is already in progress for this brand.");
       } else {
-        toast.success(`Run started — ${body.credits} credits`);
+        toast.success(`Citation Check started — ${body.credits} cr`);
         setTab("runs");
       }
       await load();
@@ -628,8 +638,8 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
               style={{ padding: "6px 8px", border: BORDER, borderRadius: 6 }}
             >
               <option value="manual">Manual only</option>
-              <option value="weekly">Weekly (~{scheduledCost || "?"} credits/run)</option>
-              <option value="monthly">Monthly (~{scheduledCost || "?"} credits/run)</option>
+              <option value="weekly">Weekly (~{scheduledCost || "?"} cr/run)</option>
+              <option value="monthly">Monthly (~{scheduledCost || "?"} cr/run)</option>
             </select>
           </label>
           <button
@@ -638,7 +648,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
             title={prompts.length === 0 ? "Add prompts first" : undefined}
             style={{ padding: "10px 18px", background: ACCENT, color: ON_ACCENT, border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer", opacity: running || prompts.length === 0 || hasActiveRun ? 0.5 : 1 }}
           >
-            {hasActiveRun ? "Run in progress…" : `Run now · ${runCost} credits`}
+            {hasActiveRun ? "Citation Check in progress…" : `Citation Check · ${runCost} cr`}
           </button>
         </div>
       </header>
@@ -671,7 +681,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
             onClick={() => setTab(t)}
             style={{ padding: "8px 2px", background: "none", border: "none", borderBottom: tab === t ? `2px solid ${BRAND_GREEN}` : "2px solid transparent", fontSize: 14, cursor: "pointer", color: tab === t ? UI.TEXT : MUTED }}
           >
-            {t === "overview" ? "Overview" : t === "prompts" ? `Prompts (${prompts.length}/30)` : `Runs (${runs.length})`}
+            {t === "overview" ? "Overview" : t === "prompts" ? `Prompts (${prompts.length}/30)` : `Citation Checks (${runs.length})`}
           </button>
         ))}
       </nav>
@@ -717,21 +727,22 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                   <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                     <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Latest run</h2>
                     <span style={{ fontSize: 12, color: FAINT }}>
-                      {latestComplete.period} · {promptsTotal ?? "?"} prompt{promptsTotal === 1 ? "" : "s"}
+                      {formatRunDate(latestComplete.createdAt)} · {promptsTotal ?? "?"} prompt{promptsTotal === 1 ? "" : "s"}
                     </span>
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                     <MetricCard
                       label="Brand citation rate"
                       value={stats?.brandCitationRate != null ? pct(stats.brandCitationRate) : "—"}
-                      sub={brand?.domain ? `replies citing ${brand.domain}` : "set a domain to track this"}
+                      sub={brand?.domain ? `prompt-runs citing ${brand.domain}` : "set a domain to track this"}
+                      info="Share of your tracked prompts where your brand was cited in the AI platform's answer."
                     />
                     <MetricCard
                       label="Brand mentions"
                       value={pct(m.brandMentionRate)}
                       sub={`${brandMentionPrompts} of ${promptsTotal} prompt${promptsTotal === 1 ? "" : "s"}`}
                     />
-                    <MetricCard label="Share of AI voice" value={soav != null ? pct(soav) : "—"} sub="brand vs competitor citations" />
+                    <MetricCard label="Tracked-prompt share" value={soav != null ? pct(soav) : "—"} sub="brand vs named-competitor citations" info="Share of voice measured only across the prompts you track and the competitors you named — not the whole category." />
                     <MetricCard label="Citations" value={String(stats?.totalCitations ?? 0)} sub={stats?.hallucinatedCitations ? `verified sources · ${stats.hallucinatedCitations} hallucinated filtered out` : "verified sources"} />
                   </div>
 
@@ -853,7 +864,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                               {m.competitorMetrics.map((c) => (
                                 <div key={c.domain} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                                   <span>{c.name} <span style={{ color: MUTED }}>({c.domain})</span></span>
-                                  <span style={{ whiteSpace: "nowrap" }}><strong>{c.totalCitations}</strong> citations · {pct(c.citationRate)}</span>
+                                  <span style={{ whiteSpace: "nowrap" }}><strong>{c.totalCitations}</strong> citations · {pct(c.citationRate)} ({Math.round(c.citationRate * promptsTotal)}/{promptsTotal} tracked prompts)</span>
                                 </div>
                               ))}
                             </div>
@@ -979,7 +990,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                     title={`Run just this prompt on ${selectedPlatforms.map((x) => PLATFORM_LABEL[x]).join(", ")}`}
                     style={{ background: "none", border: BORDER, borderRadius: 999, padding: "3px 10px", color: ACCENT, cursor: "pointer", fontWeight: 600, opacity: running || hasActiveRun ? 0.5 : 1 }}
                   >
-                    Run · {singleCost} cr
+                    Citation Check · {singleCost} cr
                   </button>
                   <button onClick={() => void toggleHistory(p.promptId)} style={{ background: "none", border: "none", color: ACCENT, cursor: "pointer" }}>
                     {historyPromptId === p.promptId ? "Hide history" : "History"}
@@ -1001,7 +1012,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                   {history[historyPromptId].map((h, i) => (
                     <div key={i}>
                       <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>
-                        {h.period} · {PLATFORM_LABEL[h.platform] ?? h.platform}
+                        {h.runCreatedAt ? formatRunDate(h.runCreatedAt) : h.period} · {PLATFORM_LABEL[h.platform] ?? h.platform}
                         {h.attempt > 1 ? ` · attempt ${h.attempt}` : ""}
                         {(i === 0 || history[historyPromptId][i - 1].version !== h.version) && (
                           <span style={{ marginLeft: 6, padding: "1px 6px", background: UI.COPPER_BG, border: BORDER, borderRadius: 999 }}>v{h.version}</span>
@@ -1046,7 +1057,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
             <div key={r.id} style={{ background: CARD, border: BORDER, borderRadius: 12, padding: "16px 18px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                 <div>
-                  <div style={{ fontSize: 16, fontWeight: 600 }}>{r.period}</div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>{formatRunDate(r.createdAt)}</div>
                   <div style={{ color: FAINT, fontSize: 12, marginTop: 3 }}>
                     {r.kind === "manual" ? "Manual run" : "Scheduled run"} · {r.promptsTotal ?? "?"} prompt{r.promptsTotal === 1 ? "" : "s"}
                     {r.scope?.platforms?.length
@@ -1063,7 +1074,8 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                   <MetricCard
                     label="Brand cited"
                     value={r.citationStats?.brandCitationRate != null ? pct(r.citationStats.brandCitationRate) : "—"}
-                    sub="of replies"
+                    sub="of prompt-runs"
+                    info="Share of your tracked prompts where your brand was cited in the AI platform's answer."
                     inset
                   />
                   <MetricCard
@@ -1076,7 +1088,14 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                   <MetricCard label="All citations" value={String(r.citationStats?.totalCitations ?? 0)} sub="sources" inset />
                 </div>
               )}
-              {r.error && <div style={{ marginTop: 8, fontSize: 12, color: RED }}>{r.error}</div>}
+              {r.status === "failed" && (
+                <div style={{ marginTop: 12, background: UI.RED_BG, border: `1px solid ${UI.RED_BORDER}`, borderRadius: 8, padding: "10px 14px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: RED }}>This Citation Check failed</div>
+                  <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
+                    Credits were refunded — you weren&apos;t charged. Try running it again, or contact support if it keeps failing.
+                  </div>
+                </div>
+              )}
               {r.status === "complete" && (
                 <button
                   onClick={() => void toggleReplies(r.id)}
