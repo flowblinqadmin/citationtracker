@@ -734,14 +734,15 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                     <MetricCard
                       label="Brand citation rate"
                       value={stats?.brandCitationRate != null ? pct(stats.brandCitationRate) : "—"}
-                      sub={brand?.domain ? `replies citing ${brand.domain}` : "set a domain to track this"}
+                      sub={brand?.domain ? `prompt-runs citing ${brand.domain}` : "set a domain to track this"}
+                      info="Share of your tracked prompts where your brand was cited in the AI platform's answer."
                     />
                     <MetricCard
                       label="Brand mentions"
                       value={pct(m.brandMentionRate)}
                       sub={`${brandMentionPrompts} of ${promptsTotal} prompt${promptsTotal === 1 ? "" : "s"}`}
                     />
-                    <MetricCard label="Share of AI voice" value={soav != null ? pct(soav) : "—"} sub="brand vs competitor citations" />
+                    <MetricCard label="Tracked-prompt share" value={soav != null ? pct(soav) : "—"} sub="brand vs named-competitor citations" info="Share of voice measured only across the prompts you track and the competitors you named — not the whole category." />
                     <MetricCard label="Citations" value={String(stats?.totalCitations ?? 0)} sub={stats?.hallucinatedCitations ? `verified sources · ${stats.hallucinatedCitations} hallucinated filtered out` : "verified sources"} />
                   </div>
 
@@ -863,7 +864,7 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                               {m.competitorMetrics.map((c) => (
                                 <div key={c.domain} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                                   <span>{c.name} <span style={{ color: MUTED }}>({c.domain})</span></span>
-                                  <span style={{ whiteSpace: "nowrap" }}><strong>{c.totalCitations}</strong> citations · {pct(c.citationRate)}</span>
+                                  <span style={{ whiteSpace: "nowrap" }}><strong>{c.totalCitations}</strong> citations · {pct(c.citationRate)} ({Math.round(c.citationRate * promptsTotal)}/{promptsTotal} tracked prompts)</span>
                                 </div>
                               ))}
                             </div>
@@ -1073,7 +1074,8 @@ export default function BrandDetail({ clientId }: { clientId: string }) {
                   <MetricCard
                     label="Brand cited"
                     value={r.citationStats?.brandCitationRate != null ? pct(r.citationStats.brandCitationRate) : "—"}
-                    sub="of replies"
+                    sub="of prompt-runs"
+                    info="Share of your tracked prompts where your brand was cited in the AI platform's answer."
                     inset
                   />
                   <MetricCard

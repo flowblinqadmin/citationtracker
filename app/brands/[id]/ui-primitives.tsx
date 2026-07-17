@@ -14,6 +14,25 @@ const MUTED = UI.T2; // Mid Grey — labels
 const FAINT = UI.T3; // Steel — sub-captions, section headers
 
 /**
+ * An inline ⓘ affordance carrying a native-title tooltip. No dependency, no
+ * portal — just a hoverable glyph so a metric's denominator/definition is one
+ * hover away without cluttering the tile. Reused wherever a stat label needs
+ * disambiguation.
+ */
+export function InfoDot({ text }: { text: string }) {
+  return (
+    <span
+      title={text}
+      role="img"
+      aria-label={text}
+      style={{ marginLeft: 4, color: FAINT, cursor: "help", fontSize: 11 }}
+    >
+      ⓘ
+    </span>
+  );
+}
+
+/**
  * A labeled stat tile — the single stat presentation shared by Overview + Runs.
  * `sub` carries the denominator/explanation so a percentage is never ambiguous.
  * `inset` swaps the white fill for the subtle grey inset used when a tile nests
@@ -24,11 +43,14 @@ export function MetricCard({
   value,
   sub,
   inset,
+  info,
 }: {
   label: string;
   value: string;
   sub?: ReactNode;
   inset?: boolean;
+  /** Optional disambiguation note shown as a native-title ⓘ glyph beside the label. */
+  info?: string;
 }) {
   return (
     <div
@@ -40,7 +62,10 @@ export function MetricCard({
         flex: "1 1 150px",
       }}
     >
-      <div style={{ fontSize: 12, color: MUTED }}>{label}</div>
+      <div style={{ fontSize: 12, color: MUTED }}>
+        {label}
+        {info && <InfoDot text={info} />}
+      </div>
       <div style={{ fontSize: 24, fontWeight: 700, margin: "4px 0" }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: FAINT }}>{sub}</div>}
     </div>

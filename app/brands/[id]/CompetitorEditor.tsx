@@ -71,7 +71,7 @@ export default function CompetitorEditor({
         return;
       }
       setDirty(false);
-      toast.success("Competitors saved — Share of AI voice now compares against them");
+      toast.success("Competitors saved — Tracked-prompt share now compares against them");
       await onSaved();
     } finally {
       setSaving(false);
@@ -85,7 +85,7 @@ export default function CompetitorEditor({
           <span style={{ fontSize: 13, fontWeight: 600, color: UI.TEXT }}>Competitors</span>{" "}
           <span style={{ fontSize: 12, color: FAINT }}>({rows.length}/{MAX_COMPETITORS})</span>
           <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
-            Drive Share of AI voice and the competitor citation table
+            Drive Tracked-prompt share and the competitor citation table
           </div>
         </div>
         {dirty && (
